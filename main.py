@@ -181,7 +181,7 @@ class GPManagerApp:
             self.aid_to_file.get(aid, f"Unknown ({aid})") for aid in installed_aids
         ]
 
-        self.installed_apps = [ app for app in installed_aids if "Unknown" not in app]
+        # self.installed_apps = [ app for app in installed_aids if "Unknown" not in app]
 
         pprint.pprint(result)
         pprint.pprint(self.installed_apps)
