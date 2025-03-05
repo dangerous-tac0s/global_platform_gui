@@ -12,18 +12,18 @@ import os
 class GPManagerApp:
     file_to_aid = {
     "FIDO2.cap": "A0000006472F0001",
-    "javacard-memory.cap": "A0000000620202",
-    "keycard.cap": "A00000080400010100",
-    "openjavacard-ndef-full.cap": "A0000005272101",
-    "openjavacard-ndef-tiny.cap": "A0000005272102",
-    "SatoChip.cap": "A00000039654534E00",
-    "Satodime.cap": "A00000039654534E01",
-    "SeedKeeper.cap": "A00000039654534E02",
+    "javacard-memory.cap": "A0000008466D656D6F727901",
+    "keycard.cap": "7465736C614C6F67696330303201",
+    "openjavacard-ndef-full.cap": "D276000124010304000A000000000000",
+    # "openjavacard-ndef-tiny.cap": "A0000005272102",
+    #"SatoChip.cap": "A00000039654534E00",
+    #"Satodime.cap": "A00000039654534E01",
+    #"SeedKeeper.cap": "A00000039654534E02",
     "SmartPGPApplet-default.cap": "A000000151000000",
     "SmartPGPApplet-large.cap": "A000000151000001",
     "U2FApplet.cap": "A0000006472F0002",
-    "vivokey-otp.cap": "A0000005272103",
-    "YkHMACApplet.cap": "A0000005272104"
+    "vivokey-otp.cap": "A0000006472F000101",
+    "YkHMACApplet.cap": "A000000527200101"
 }
 
 
@@ -176,6 +176,8 @@ class GPManagerApp:
 
         aid_pattern = re.compile(r"(APP|Applet):\s([A-Fa-f0-9]+)")
         installed_aids = [match.group(2) for line in output_lines if (match := aid_pattern.search(line))]
+        print(installed_aids)
+        pprint.pprint(self.aid_to_file)
 
         self.installed_apps = [
             self.aid_to_file.get(aid, f"Unknown ({aid})") for aid in installed_aids
@@ -220,7 +222,8 @@ class GPManagerApp:
                 return
 
             # Install the app using gp.exe
-            result = subprocess.run([*self.gp[self.os], "--install", cap_file_path], capture_output=True, text=True)
+            result = subprocess.run([*self.gp[self.os], "--install", app], capture_output=True, text=True)
+
             if "Install Success" in result.stdout:
                 self.available_apps.remove(app)
                 self.installed_apps.append(app)
