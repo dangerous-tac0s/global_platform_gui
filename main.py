@@ -22,7 +22,7 @@ class GPManagerApp:
     "SmartPGPApplet-default.cap": "A000000151000000",
     "SmartPGPApplet-large.cap": "A000000151000001",
     "U2FApplet.cap": "A0000006472F0002",
-    "vivokey-otp.cap": "A0000006472F000101",
+    "vivokey-otp.cap": "A0000005272101014150455801",
     "YkHMACApplet.cap": "A000000527200101"
 }
 
@@ -193,10 +193,11 @@ class GPManagerApp:
         self.installed_listbox.delete(0, tk.END)
         for app in sorted(self.installed_apps):
             self.installed_listbox.insert(tk.END, app)
+        self.update_available_list()
 
     def update_available_list(self):
         self.available_listbox.delete(0, tk.END)
-        for app in sorted(self.available_apps):
+        for app in [each for each in sorted(self.available_apps) if each not in self.installed_apps]:
             self.available_listbox.insert(tk.END, app)
 
     def install_app(self):
@@ -227,8 +228,8 @@ class GPManagerApp:
             if "Install Success" in result.stdout:
                 self.available_apps.remove(app)
                 self.installed_apps.append(app)
-                self.update_available_list()
                 self.update_installed_list()
+                # self.update_available_list()
             else:
                 print(result)
 
