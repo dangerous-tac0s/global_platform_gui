@@ -1,12 +1,21 @@
 import pprint
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 import subprocess
-import re
+from smartcard.System import readers
+from smartcard.CardConnection import CardConnection
+from smartcard.util import toHexString
 
+import re
 import requests
 import threading
 import os
+
+
+def is_jcop3(atr_string):
+    jcop3_regex = r"^3B8[0-9A-F]8001[4A4E]{2}[a-zA-Z0-9]{6,20}$"
+    return bool(re.match(jcop3_regex, atr_string.replace(" ", "")))
 
 
 class GPManagerApp:
@@ -15,10 +24,10 @@ class GPManagerApp:
         "javacard-memory.cap": "A0000008466D656D6F727901",
         "keycard.cap": "7465736C614C6F67696330303201",
         "openjavacard-ndef-full.cap": "D2760000850101",
-        # "openjavacard-ndef-tiny.cap": "D2760000850101",
-        # "SatoChip.cap": "A00000039654534E00",
-        # "Satodime.cap": "A00000039654534E01",
-        # "SeedKeeper.cap": "A00000039654534E02",
+        "openjavacard-ndef-tiny.cap": "D2760000850101",
+        "SatoChip.cap": "A00000039654534E00",
+        "Satodime.cap": "A00000039654534E01",
+        "SeedKeeper.cap": "A00000039654534E02",
         "SmartPGPApplet-default.cap": "A000000151000000",
         "SmartPGPApplet-large.cap": "A000000151000001",
         "U2FApplet.cap": "A0000006472F0002",
@@ -59,19 +68,26 @@ class GPManagerApp:
         self.fetch_available_apps()
 
         self.detect_card_readers()
-        threading.Thread(target=self.wait_for_card, daemon=True).start()
+        self.card_thread = threading.Thread(target=self.detect_card_loop, daemon=True)
+        self.card_thread.start()
+
+        self.loading = False
+        self.status = ""
+
+        self.card_detected = False
+        self.card_present = False  # Used to track state changes
+        self.running = True  # Used to stop the thread if needed
 
     def setup_ui(self):
-        # Card Reader Selection
-        self.reader_label = ttk.Label(self.root, text="Card Reader:")
-        self.reader_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
         self.reader_var = tk.StringVar()
         self.reader_dropdown = ttk.Combobox(
             self.root, textvariable=self.reader_var, state="readonly"
         )
-        self.reader_dropdown.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.reader_dropdown.grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.reader_dropdown.bind("<<ComboboxSelected>>", self.on_reader_selected)
+
+        self.status_label = ttk.Label(self.root, text="Starting...")
+        self.status_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
         # Installed Apps List
         self.installed_label = ttk.Label(self.root, text="Installed Apps")
@@ -107,6 +123,9 @@ class GPManagerApp:
         repo = "DangerousThings/flexsecure-applets"
         url = f"https://api.github.com/repos/{repo}/releases/latest"
 
+        self.loading = True
+        self.status_label.config(text=f"Finding latest release...")
+
         try:
             response = requests.get(url)
             if response.status_code == 200:
@@ -123,7 +142,9 @@ class GPManagerApp:
 
                 self.available_apps = [link.split("/")[-1] for link in cap_files]
                 self.update_available_list()
+                self.status_label.config(text=f"Available apps fetched.")
             else:
+                self.status_label.config(text=f"Unable to fetch current release.")
                 print(f"GitHub API error: {response.status_code} - {response.text}")
 
                 self.available_apps = []
@@ -131,22 +152,18 @@ class GPManagerApp:
         except Exception as e:
             print(f"Error: {e}")
 
+        self.loading = False
+
     def detect_card_readers(self):
         """Detects connected smart card readers."""
         try:
-            if self.os == "nt":
-                # Windows: Use PySCARD
-                import smartcard.System
+            result = subprocess.run(
+                [*self.gp[self.os], "-r"], capture_output=True, text=True
+            )
 
-                readers = [str(reader) for reader in smartcard.System.readers()]
-            else:
-                # Linux/macOS: Use pcsc_list_readers
-                result = subprocess.run(
-                    ["pcsc_scan", "-r"], capture_output=True, text=True
-                )
-                readers = [
-                    line.strip() for line in result.stdout.splitlines() if line.strip()
-                ]
+            readers = [
+                line.strip() for line in result.stdout.splitlines() if line.strip()
+            ]
 
             if readers:
                 self.reader_dropdown["values"] = readers
@@ -157,6 +174,42 @@ class GPManagerApp:
                 )
         except Exception as e:
             messagebox.showerror("Error", f"Failed to detect card readers: {e}")
+
+    def detect_card_loop(self):
+        """Continuously checks for smartcard presence in the background."""
+        r = readers()
+        if not r:
+            self.update_status("No smartcard reader found.")
+            return
+
+        reader = r[0]  # Use the first available reader
+        connection = reader.createConnection()
+
+        while self.running:
+            try:
+                connection.connect(CardConnection.T1_protocol)
+                atr = connection.getATR()
+                atr_str = toHexString(atr)
+
+                if is_jcop3(atr_str):  # JCOP detected
+                    self.update_status(f"JCOP3 Smartcard detected!")
+                    self.card_detected = True
+
+                    if not self.card_present:  # First time detecting card
+                        self.card_present = True
+                        self.get_installed_apps()
+
+                else:  # Card detected but not JCOP
+                    self.update_status(f"Card detected, but not JCOP.")
+                    self.card_detected = True
+
+            except Exception:  # No card present
+                self.card_detected = False
+                if self.card_present:  # Only update if it was previously detected
+                    self.card_present = False
+                    self.update_status("No smartcard present.")
+
+            time.sleep(1)  # Polling interval (adjust if needed)
 
     def detect_reader_and_wait_for_card(self):
         """Detects card readers and waits for a card to be presented."""
@@ -173,6 +226,8 @@ class GPManagerApp:
             result = subprocess.run(
                 [*self.gp[self.os], "-l"], capture_output=True, text=True
             )
+            if self.status_label.cget("text") != "Waiting for card...":
+                self.status_label.config(text="Waiting for card...")
             if "No card present" not in result.stdout:
                 self.get_installed_apps()
                 self.install_button["state"] = tk.NORMAL
@@ -181,6 +236,7 @@ class GPManagerApp:
 
     def get_installed_apps(self):
         """Fetch installed apps from gp.exe and map AIDs to names."""
+        self.status_label.config(text="Getting installed apps...")
         result = subprocess.run(
             [*self.gp[self.os], "-l"], capture_output=True, text=True
         )
@@ -198,11 +254,10 @@ class GPManagerApp:
             self.aid_to_file.get(aid, f"Unknown ({aid})") for aid in installed_aids
         ]
 
-        # self.installed_apps = [ app for app in installed_aids if "Unknown" not in app]
-
-        pprint.pprint(result)
-        pprint.pprint(self.installed_apps)
         self.update_installed_list()
+        self.status_label.config(
+            text=f"Found {len(self.installed_apps) if len(self.installed_apps) != 0 else "no"} apps."
+        )
 
     def update_installed_list(self):
         self.installed_listbox.delete(0, tk.END)
@@ -225,8 +280,12 @@ class GPManagerApp:
         if selected:
             app = self.available_listbox.get(selected[0])
             if app in self.unsupported_apps:
+                self.status_label.config(
+                    text=f"{app} is not currently supported by this application."
+                )
                 return
 
+            self.status_label.config(text="Downloading latest version...")
             app_url = f"{self.current_release}/{app}"
             try:
                 response = requests.get(app_url)
@@ -245,18 +304,21 @@ class GPManagerApp:
                 print(f"Error downloading {app}: {e}")
                 return
 
+            self.status_label.config(text="Installing app. Keep smartcard on reader.")
             # Install the app using gp.exe
             result = subprocess.run(
                 [*self.gp[self.os], "--install", app], capture_output=True, text=True
             )
 
-            if "Install Success" in result.stdout:
+            if "Error:" not in result.stdout:
                 self.available_apps.remove(app)
                 self.installed_apps.append(app)
                 self.update_installed_list()
+                self.status_label.config(text=f"{app} has been installed.")
                 # self.update_available_list()
             else:
                 print(result)
+                self.status_label.config(text=f"Installation failed.")
 
             if os.path.exists(cap_file_path):
                 os.remove(cap_file_path)  # Remove the CAP file after installation
@@ -269,6 +331,7 @@ class GPManagerApp:
         selected = self.installed_listbox.curselection()
         if selected:
             app = self.installed_listbox.get(selected[0])
+            self.status_label.config(text=f"Uninstalling {app}...")
             aid = self.file_to_aid.get(app)
             if not aid:
                 return
@@ -282,9 +345,15 @@ class GPManagerApp:
                 self.installed_apps.remove(app)
                 self.available_apps.append(app)
                 self.update_installed_list()
-                self.update_available_list()
+                self.status_label.config(text=f"Uninstall failed.")
             else:
-                print(result)
+                self.status_label.config(text=f"{app} has been uninstalled.")
+            self.update_available_list()
+            print(result)
+
+    def update_status(self, text):
+        """Update the Tkinter label safely from another thread."""
+        self.root.after(0, self.status_label.config, {"text": text})
 
 
 if __name__ == "__main__":
