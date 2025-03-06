@@ -204,10 +204,14 @@ class GPManagerApp:
                     self.update_status(f"Card detected, but not JCOP.")
                     self.card_detected = True
                     self.update_button_state()
+                    time.sleep(1)
 
             except Exception:  # No card present
                 self.card_detected = False
-                if self.card_present:  # Only update if it was previously detected
+                if (
+                    self.card_present
+                    or self.status_label.cget("text") != "No card present."
+                ):  # Only update if it was previously detected
                     self.card_present = False
                     self.update_status("No card present.")
                     self.update_button_state()
