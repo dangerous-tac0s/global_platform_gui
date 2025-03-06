@@ -194,19 +194,17 @@ class GPManagerApp:
 
                 if is_jcop3(atr_str):  # JCOP detected
                     if (
-                        self.card_present
-                        and self.status_label.cget("text") == "Card present."
+                        not self.card_present
+                        or self.status_label.cget("text") != "Card present."
                     ):
-                        return
-
-                    self.update_status(f"Card present.")
-                    self.card_detected = True
-                    self.update_button_state()
-
-                    if not self.card_present:  # First time detecting card
-                        self.card_present = True
-                        self.get_installed_apps()
+                        self.update_status(f"Card present.")
+                        self.card_detected = True
                         self.update_button_state()
+
+                        if not self.card_present:  # First time detecting card
+                            self.card_present = True
+                            self.get_installed_apps()
+                            self.update_button_state()
 
                 else:  # Card detected but not JCOP
                     self.update_status(f"Card detected, but not JCOP.")
