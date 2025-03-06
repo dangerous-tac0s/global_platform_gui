@@ -11,30 +11,31 @@ import os
 
 class GPManagerApp:
     file_to_aid = {
-    "FIDO2.cap": "A0000006472F0001",
-    "javacard-memory.cap": "A0000008466D656D6F727901",
-    "keycard.cap": "7465736C614C6F67696330303201",
-    "openjavacard-ndef-full.cap": "D276000124010304000A000000000000",
-    # "openjavacard-ndef-tiny.cap": "A0000005272102",
-    #"SatoChip.cap": "A00000039654534E00",
-    #"Satodime.cap": "A00000039654534E01",
-    #"SeedKeeper.cap": "A00000039654534E02",
-    "SmartPGPApplet-default.cap": "A000000151000000",
-    "SmartPGPApplet-large.cap": "A000000151000001",
-    "U2FApplet.cap": "A0000006472F0002",
-    "vivokey-otp.cap": "A0000005272101014150455801",
-    "YkHMACApplet.cap": "A000000527200101"
-}
+        "FIDO2.cap": "A0000006472F0001",
+        "javacard-memory.cap": "A0000008466D656D6F727901",
+        "keycard.cap": "7465736C614C6F67696330303201",
+        "openjavacard-ndef-full.cap": "D2760000850101",
+        # "openjavacard-ndef-tiny.cap": "D2760000850101",
+        # "SatoChip.cap": "A00000039654534E00",
+        # "Satodime.cap": "A00000039654534E01",
+        # "SeedKeeper.cap": "A00000039654534E02",
+        "SmartPGPApplet-default.cap": "A000000151000000",
+        "SmartPGPApplet-large.cap": "A000000151000001",
+        "U2FApplet.cap": "A0000006472F0002",
+        "vivokey-otp.cap": "A0000005272101014150455801",
+        "YkHMACApplet.cap": "A000000527200101",
+    }
 
+    unsupported_apps = ["FIDO2.cap", "openjavacard-ndef-full.cap"]
 
     aid_to_file = {name: aid for aid, name in file_to_aid.items()}
 
     def __init__(self, root):
         def get_os():
-            if os.name == 'nt' or os.name == "posix":
+            if os.name == "nt" or os.name == "posix":
                 return os.name
             else:
-                return 'Unknown'
+                return "Unknown"
 
         self.root = root
         self.root.title("GlobalPlatformPro App Manager")
@@ -43,10 +44,7 @@ class GPManagerApp:
         self.setup_ui()
 
         self.os = get_os()
-        self.gp = {
-             "posix":
-                ["java", "-jar", "gp.jar"],
-            "nt": ["gp.exe"]        }
+        self.gp = {"posix": ["java", "-jar", "gp.jar"], "nt": ["gp.exe"]}
 
         if self.os == "Unknown":
             messagebox.showerror("Error", f"Unable to determine OS.")
@@ -63,14 +61,15 @@ class GPManagerApp:
         self.detect_card_readers()
         threading.Thread(target=self.wait_for_card, daemon=True).start()
 
-
     def setup_ui(self):
         # Card Reader Selection
         self.reader_label = ttk.Label(self.root, text="Card Reader:")
         self.reader_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
 
         self.reader_var = tk.StringVar()
-        self.reader_dropdown = ttk.Combobox(self.root, textvariable=self.reader_var, state="readonly")
+        self.reader_dropdown = ttk.Combobox(
+            self.root, textvariable=self.reader_var, state="readonly"
+        )
         self.reader_dropdown.grid(row=0, column=1, padx=5, pady=5, sticky="w")
         self.reader_dropdown.bind("<<ComboboxSelected>>", self.on_reader_selected)
 
@@ -81,7 +80,9 @@ class GPManagerApp:
         self.installed_listbox = tk.Listbox(self.root, height=15, width=40)
         self.installed_listbox.grid(row=2, column=0, padx=5, pady=5)
 
-        self.uninstall_button = ttk.Button(self.root, text="Uninstall", command=self.uninstall_app, state=tk.DISABLED)
+        self.uninstall_button = ttk.Button(
+            self.root, text="Uninstall", command=self.uninstall_app, state=tk.DISABLED
+        )
         self.uninstall_button.grid(row=3, column=0, padx=5, pady=5)
 
         # Available Apps List
@@ -91,7 +92,9 @@ class GPManagerApp:
         self.available_listbox = tk.Listbox(self.root, height=15, width=40)
         self.available_listbox.grid(row=2, column=1, padx=5, pady=5)
 
-        self.install_button = ttk.Button(self.root, text="Install", command=self.install_app, state=tk.DISABLED)
+        self.install_button = ttk.Button(
+            self.root, text="Install", command=self.install_app, state=tk.DISABLED
+        )
         self.install_button.grid(row=3, column=1, padx=5, pady=5)
 
     def on_reader_selected(self, event):
@@ -118,7 +121,7 @@ class GPManagerApp:
                 chunked.pop()
                 self.current_release = "/".join(chunked)
 
-                self.available_apps = [link.split('/')[-1] for link in cap_files]
+                self.available_apps = [link.split("/")[-1] for link in cap_files]
                 self.update_available_list()
             else:
                 print(f"GitHub API error: {response.status_code} - {response.text}")
@@ -128,25 +131,30 @@ class GPManagerApp:
         except Exception as e:
             print(f"Error: {e}")
 
-
-
     def detect_card_readers(self):
         """Detects connected smart card readers."""
         try:
             if self.os == "nt":
                 # Windows: Use PySCARD
                 import smartcard.System
+
                 readers = [str(reader) for reader in smartcard.System.readers()]
             else:
                 # Linux/macOS: Use pcsc_list_readers
-                result = subprocess.run(["pcsc_scan", "-r"], capture_output=True, text=True)
-                readers = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+                result = subprocess.run(
+                    ["pcsc_scan", "-r"], capture_output=True, text=True
+                )
+                readers = [
+                    line.strip() for line in result.stdout.splitlines() if line.strip()
+                ]
 
             if readers:
                 self.reader_dropdown["values"] = readers
                 self.reader_var.set(readers[0])  # Select first reader by default
             else:
-                messagebox.showwarning("No Readers Found", "No smart card readers detected.")
+                messagebox.showwarning(
+                    "No Readers Found", "No smart card readers detected."
+                )
         except Exception as e:
             messagebox.showerror("Error", f"Failed to detect card readers: {e}")
 
@@ -154,7 +162,7 @@ class GPManagerApp:
         """Detects card readers and waits for a card to be presented."""
         try:
             self.detect_card_readers()
-            if len(self.reader_dropdown['values']) > 0:
+            if len(self.reader_dropdown["values"]) > 0:
                 self.wait_for_card()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to detect card readers: {e}")
@@ -162,7 +170,9 @@ class GPManagerApp:
     def wait_for_card(self):
         """Waits until a card is presented."""
         while True:
-            result = subprocess.run([*self.gp[self.os], "-l"], capture_output=True, text=True)
+            result = subprocess.run(
+                [*self.gp[self.os], "-l"], capture_output=True, text=True
+            )
             if "No card present" not in result.stdout:
                 self.get_installed_apps()
                 self.install_button["state"] = tk.NORMAL
@@ -171,12 +181,17 @@ class GPManagerApp:
 
     def get_installed_apps(self):
         """Fetch installed apps from gp.exe and map AIDs to names."""
-        result = subprocess.run([*self.gp[self.os], "-l"], capture_output=True, text=True)
+        result = subprocess.run(
+            [*self.gp[self.os], "-l"], capture_output=True, text=True
+        )
         output_lines = result.stdout.splitlines()
 
         aid_pattern = re.compile(r"(APP|Applet):\s([A-Fa-f0-9]+)")
-        installed_aids = [match.group(2) for line in output_lines if (match := aid_pattern.search(line))]
-        print(installed_aids)
+        installed_aids = [
+            match.group(2)
+            for line in output_lines
+            if (match := aid_pattern.search(line))
+        ]
         pprint.pprint(self.aid_to_file)
 
         self.installed_apps = [
@@ -197,7 +212,11 @@ class GPManagerApp:
 
     def update_available_list(self):
         self.available_listbox.delete(0, tk.END)
-        for app in [each for each in sorted(self.available_apps) if each not in self.installed_apps]:
+        for app in [
+            each
+            for each in sorted(self.available_apps)
+            if each not in self.installed_apps
+        ]:
             self.available_listbox.insert(tk.END, app)
 
     def install_app(self):
@@ -205,6 +224,8 @@ class GPManagerApp:
         selected = self.available_listbox.curselection()
         if selected:
             app = self.available_listbox.get(selected[0])
+            if app in self.unsupported_apps:
+                return
 
             app_url = f"{self.current_release}/{app}"
             try:
@@ -212,18 +233,22 @@ class GPManagerApp:
                 if response.status_code == 200:
                     # Save the file locally
                     cap_file_path = app
-                    with open(cap_file_path, 'wb') as f:
+                    with open(cap_file_path, "wb") as f:
                         f.write(response.content)
                     print(f"Downloaded {app} to {cap_file_path}")
                 else:
-                    print(f"Failed to download {app}. Status code: {response.status_code}")
+                    print(
+                        f"Failed to download {app}. Status code: {response.status_code}"
+                    )
                     return  # If download fails, exit the method
             except requests.RequestException as e:
                 print(f"Error downloading {app}: {e}")
                 return
 
             # Install the app using gp.exe
-            result = subprocess.run([*self.gp[self.os], "--install", app], capture_output=True, text=True)
+            result = subprocess.run(
+                [*self.gp[self.os], "--install", app], capture_output=True, text=True
+            )
 
             if "Install Success" in result.stdout:
                 self.available_apps.remove(app)
@@ -244,12 +269,22 @@ class GPManagerApp:
         selected = self.installed_listbox.curselection()
         if selected:
             app = self.installed_listbox.get(selected[0])
-            result = subprocess.run([*self.gp[self.os], "--uninstall", app], capture_output=True, text=True)
-            if "Uninstall Success" in result.stdout:
+            aid = self.file_to_aid.get(app)
+            if not aid:
+                return
+
+            result = subprocess.run(
+                [*self.gp[self.os], "--delete", aid],
+                capture_output=True,
+                text=True,
+            )
+            if "Could not delete" not in result.stdout:
                 self.installed_apps.remove(app)
                 self.available_apps.append(app)
                 self.update_installed_list()
                 self.update_available_list()
+            else:
+                print(result)
 
 
 if __name__ == "__main__":
