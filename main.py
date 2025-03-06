@@ -20,16 +20,16 @@ def is_jcop3(atr_string):
 
 class GPManagerApp:
     file_to_aid = {
-        "FIDO2.cap": "A0000006472F0001",
+        "FIDO2.cap": "A0000006472F000101",
         "javacard-memory.cap": "A0000008466D656D6F727901",
-        "keycard.cap": "7465736C614C6F67696330303201",
+        "keycard.cap": "5361746F4368697000",
         "openjavacard-ndef-full.cap": "D2760000850101",
         "openjavacard-ndef-tiny.cap": "D2760000850101",
-        "SatoChip.cap": "A00000039654534E00",
-        "Satodime.cap": "A00000039654534E01",
-        "SeedKeeper.cap": "A00000039654534E02",
-        "SmartPGPApplet-default.cap": "A000000151000000",
-        "SmartPGPApplet-large.cap": "A000000151000001",
+        "SatoChip.cap": "A00000052721010141504558",
+        "Satodime.cap": "5361746F44696D6500",
+        "SeedKeeper.cap": "536565644B656570657200",
+        "SmartPGPApplet-default.cap": "D276000124010304000A000000000000",
+        "SmartPGPApplet-large.cap": "D276000124010304000A000000000000",
         "U2FApplet.cap": "A0000006472F0002",
         "vivokey-otp.cap": "A0000005272101014150455801",
         "YkHMACApplet.cap": "A000000527200101",
@@ -123,7 +123,7 @@ class GPManagerApp:
         url = f"https://api.github.com/repos/{repo}/releases/latest"
 
         self.set_loading(True)
-        self.status_label.config(text=f"Finding latest release...")
+        self.update_status(f"Finding latest release...")
 
         try:
             response = requests.get(url)
@@ -141,9 +141,11 @@ class GPManagerApp:
 
                 self.available_apps = [link.split("/")[-1] for link in cap_files]
                 self.update_available_list()
-                self.status_label.config(text=f"Available apps fetched.")
+                self.update_status(
+                    f"Available apps fetched: {len(self.available_apps) if len(self.available_apps) > 0 else 'None'}"
+                )
             else:
-                self.status_label.config(text=f"Unable to fetch current release.")
+                self.update_status(f"Unable to fetch current release.")
                 print(f"GitHub API error: {response.status_code} - {response.text}")
 
                 self.available_apps = []
@@ -191,6 +193,12 @@ class GPManagerApp:
                 atr_str = toHexString(atr)
 
                 if is_jcop3(atr_str):  # JCOP detected
+                    if (
+                        self.card_present
+                        and self.status_label.cget("text") == "Card present."
+                    ):
+                        return
+
                     self.update_status(f"Card present.")
                     self.card_detected = True
                     self.update_button_state()
@@ -204,7 +212,6 @@ class GPManagerApp:
                     self.update_status(f"Card detected, but not JCOP.")
                     self.card_detected = True
                     self.update_button_state()
-                    time.sleep(1)
 
             except Exception:  # No card present
                 self.card_detected = False
@@ -234,7 +241,7 @@ class GPManagerApp:
                 [*self.gp[self.os], "-l"], capture_output=True, text=True
             )
             if self.status_label.cget("text") != "Waiting for card...":
-                self.status_label.config(text="Waiting for card...")
+                self.update_status("Waiting for card...")
             if "No card present" not in result.stdout:
                 self.get_installed_apps()
                 self.install_button["state"] = tk.NORMAL
@@ -243,18 +250,21 @@ class GPManagerApp:
 
     def get_installed_apps(self):
         """Fetch installed apps from gp.exe and map AIDs to names."""
-        self.status_label.config(text="Getting installed apps...")
+        self.update_status("Getting installed apps...")
+
         result = subprocess.run(
             [*self.gp[self.os], "-l"], capture_output=True, text=True
         )
         output_lines = result.stdout.splitlines()
 
-        aid_pattern = re.compile(r"(APP|Applet):\s([A-Fa-f0-9]+)")
+        aid_pattern = re.compile(r"APP:\s([A-Fa-f0-9]+)\s\(SELECTABLE\)")
+
         installed_aids = [
-            match.group(2)
+            match.group(1)
             for line in output_lines
             if (match := aid_pattern.search(line))
         ]
+        installed_aids = [aid for aid in installed_aids if aid != "A0000001515350"]
         pprint.pprint(self.aid_to_file)
 
         self.installed_apps = [
@@ -262,8 +272,8 @@ class GPManagerApp:
         ]
 
         self.update_installed_list()
-        self.status_label.config(
-            text=f"Found {len(self.installed_apps) if len(self.installed_apps) != 0 else "no"} apps."
+        self.update_status(
+            f"Found {len(self.installed_apps) if len(self.installed_apps) != 0 else "no"} apps."
         )
 
     def update_installed_list(self):
@@ -287,14 +297,12 @@ class GPManagerApp:
         if selected:
             app = self.available_listbox.get(selected[0])
             if app in self.unsupported_apps:
-                self.status_label.config(
-                    text=f"{app} is not currently supported by this application."
-                )
+                self.update_status(f"That app is not supported by this application.")
                 return
 
             self.set_loading(True)
 
-            self.status_label.config(text="Downloading latest version...")
+            self.update_status("Downloading latest version...")
             app_url = f"{self.current_release}/{app}"
             try:
                 response = requests.get(app_url)
@@ -313,21 +321,25 @@ class GPManagerApp:
                 print(f"Error downloading {app}: {e}")
                 return
 
-            self.status_label.config(text="Installing app. Keep smartcard on reader.")
+            self.update_status("Installing app. Keep smartcard on reader.")
             # Install the app using gp.exe
             result = subprocess.run(
                 [*self.gp[self.os], "--install", app], capture_output=True, text=True
             )
 
-            if "Error:" not in result.stdout:
+            pprint.pprint(result)
+            if (
+                "Error:" not in result.stderr
+                and "Invalid argument" not in result.stderr
+            ):
                 self.available_apps.remove(app)
                 self.installed_apps.append(app)
                 self.update_installed_list()
-                self.status_label.config(text=f"{app} has been installed.")
-                # self.update_available_list()
+                self.update_status(f"{app} has been installed.")
+                self.update_available_list()
             else:
-                print(result)
-                self.status_label.config(text=f"Installation failed.")
+                print(result.stderr)
+                self.update_status(f"Installation failed.")
 
             if os.path.exists(cap_file_path):
                 os.remove(cap_file_path)  # Remove the CAP file after installation
@@ -340,35 +352,51 @@ class GPManagerApp:
     def uninstall_app(self):
         """Uninstalls the selected app."""
         selected = self.installed_listbox.curselection()
-        if selected:
+        if selected and not self.loading:
             app = self.installed_listbox.get(selected[0])
-            self.status_label.config(text=f"Uninstalling {app}...")
+
+            self.update_status(f"Uninstalling {app}...")
             aid = self.file_to_aid.get(app)
             if not aid:
                 return
 
             self.set_loading(True)
 
-            result = subprocess.run(
-                [*self.gp[self.os], "--delete", aid],
+            # Get "From" line to delete app
+            from_result = subprocess.run(
+                [*self.gp[self.os], "-l"],
                 capture_output=True,
                 text=True,
             )
-            if "Could not delete" not in result.stdout:
-                self.installed_apps.remove(app)
-                self.available_apps.append(app)
-                self.update_installed_list()
-                self.status_label.config(text=f"Uninstall failed.")
+
+            app_pattern = rf"APP:\s*{aid}\s*\(SELECTABLE\)(.*?)From:\s*([\w]+)"
+            match = re.search(app_pattern, from_result.stdout, re.DOTALL)
+
+            if match:
+                result = subprocess.run(
+                    [*self.gp[self.os], "--force", "--delete", match.group(2)],
+                    capture_output=True,
+                    text=True,
+                )
+
+                if "Could not delete" not in result.stderr:
+                    if app in self.installed_apps:
+                        self.installed_apps.remove(app)
+                        self.update_installed_list()
+                    if app not in self.available_apps:
+                        self.available_apps.append(app)
+                        self.update_available_list()
+                    self.update_status(f"{app} has been uninstalled.")
+
             else:
-                self.status_label.config(text=f"{app} has been uninstalled.")
-            self.update_available_list()
-            print(result)
+                self.update_status("Uninstall failed.")
 
             self.set_loading(False)
 
     def update_status(self, text):
         """Update the Tkinter label safely from another thread."""
-        self.root.after(0, self.status_label.config, {"text": text})
+        self.root.after(0, lambda: self.status_label.config(text=text))
+        time.sleep(1)
 
     def update_button_state(self):
         if self.loading or not self.card_present:
