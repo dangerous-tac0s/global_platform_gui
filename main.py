@@ -52,6 +52,12 @@ class GPManagerApp:
         # UI Layout
         self.setup_ui()
 
+        self.loading = True
+        self.status = ""
+        self.card_detected = False
+        self.card_present = False  # Used to track state changes
+        self.running = True  # Used to stop the thread if needed
+
         self.os = get_os()
         self.gp = {"posix": ["java", "-jar", "gp.jar"], "nt": ["gp.exe"]}
 
@@ -70,13 +76,6 @@ class GPManagerApp:
         self.detect_card_readers()
         self.card_thread = threading.Thread(target=self.detect_card_loop, daemon=True)
         self.card_thread.start()
-
-        self.loading = False
-        self.status = ""
-
-        self.card_detected = False
-        self.card_present = False  # Used to track state changes
-        self.running = True  # Used to stop the thread if needed
 
     def setup_ui(self):
         self.reader_var = tk.StringVar()
@@ -123,7 +122,7 @@ class GPManagerApp:
         repo = "DangerousThings/flexsecure-applets"
         url = f"https://api.github.com/repos/{repo}/releases/latest"
 
-        self.loading = True
+        self.set_loading(True)
         self.status_label.config(text=f"Finding latest release...")
 
         try:
@@ -152,7 +151,7 @@ class GPManagerApp:
         except Exception as e:
             print(f"Error: {e}")
 
-        self.loading = False
+        self.set_loading(False)
 
     def detect_card_readers(self):
         """Detects connected smart card readers."""
@@ -192,22 +191,26 @@ class GPManagerApp:
                 atr_str = toHexString(atr)
 
                 if is_jcop3(atr_str):  # JCOP detected
-                    self.update_status(f"JCOP3 Smartcard detected!")
+                    self.update_status(f"Card present.")
                     self.card_detected = True
+                    self.update_button_state()
 
                     if not self.card_present:  # First time detecting card
                         self.card_present = True
                         self.get_installed_apps()
+                        self.update_button_state()
 
                 else:  # Card detected but not JCOP
                     self.update_status(f"Card detected, but not JCOP.")
                     self.card_detected = True
+                    self.update_button_state()
 
             except Exception:  # No card present
                 self.card_detected = False
                 if self.card_present:  # Only update if it was previously detected
                     self.card_present = False
-                    self.update_status("No smartcard present.")
+                    self.update_status("No card present.")
+                    self.update_button_state()
 
             time.sleep(1)  # Polling interval (adjust if needed)
 
@@ -285,6 +288,8 @@ class GPManagerApp:
                 )
                 return
 
+            self.set_loading(True)
+
             self.status_label.config(text="Downloading latest version...")
             app_url = f"{self.current_release}/{app}"
             try:
@@ -326,6 +331,8 @@ class GPManagerApp:
             else:
                 print(f"CAP file not found for {app}.")
 
+            self.set_loading(False)
+
     def uninstall_app(self):
         """Uninstalls the selected app."""
         selected = self.installed_listbox.curselection()
@@ -335,6 +342,8 @@ class GPManagerApp:
             aid = self.file_to_aid.get(app)
             if not aid:
                 return
+
+            self.set_loading(True)
 
             result = subprocess.run(
                 [*self.gp[self.os], "--delete", aid],
@@ -351,9 +360,24 @@ class GPManagerApp:
             self.update_available_list()
             print(result)
 
+            self.set_loading(False)
+
     def update_status(self, text):
         """Update the Tkinter label safely from another thread."""
         self.root.after(0, self.status_label.config, {"text": text})
+
+    def update_button_state(self):
+        if self.loading or not self.card_present:
+            self.root.after(0, lambda: self.install_button.config(state=tk.DISABLED))
+            self.root.after(0, lambda: self.uninstall_button.config(state=tk.DISABLED))
+        else:
+            self.root.after(0, lambda: self.install_button.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.uninstall_button.config(state=tk.NORMAL))
+
+    def set_loading(self, loading: bool):
+        if loading != self.loading:
+            self.loading = loading
+            self.update_button_state()
 
 
 if __name__ == "__main__":
