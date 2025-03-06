@@ -1,6 +1,9 @@
 # Global Platform GUI
 A quick attempt at GUI wrapper for Global Platform Pro geared towards flexSecure.
 
+> [!CAUTION]
+> DO NOT USE ON APEX DEVICES OR THOSE OTHERWISE CONFIGURED WITH NON-DEFAULT PASSWORDS--THE DEVICE WILL BE BRICKED!
+
 Very early. Needs some cleanup.
 
 Features:
