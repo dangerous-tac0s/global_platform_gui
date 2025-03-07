@@ -195,20 +195,21 @@ class GPManagerApp:
         """Detects connected smart card readers."""
         try:
             result = subprocess.run(
+                # Slice the command to exclude the selected reader as we are getting our options now
                 [*self.gp[self.os][0 : 5 if self.os == "posix" else 3], "-r"],
                 capture_output=True,
                 text=True,
             )
 
-            readers = [
+            reader_list = [
                 line.strip().replace("- ", "")
                 for line in result.stdout.splitlines()
                 if line.strip() and "Available" not in line
             ]
 
-            if readers:
-                self.reader_dropdown["values"] = readers
-                self.reader_var.set(readers[0])  # Select first reader by default
+            if reader_list:
+                self.reader_dropdown["values"] = reader_list
+                self.reader_var.set(reader_list[0])  # Select first reader by default
             else:
                 messagebox.showwarning(
                     "No Readers Found", "No smart card readers detected."
