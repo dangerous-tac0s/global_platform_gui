@@ -61,8 +61,22 @@ class GPManagerApp:
 
         self.os = get_os()
         self.gp = {
-            "posix": ["java", "-jar", "gp.jar", "-k", DEFAULT_KEY],
-            "nt": ["gp.exe", "-k", DEFAULT_KEY],
+            "posix": [
+                "java",
+                "-jar",
+                "gp.jar",
+                "-k",
+                DEFAULT_KEY,
+                "--reader",
+                self.reader_var.get(),
+            ],
+            "nt": [
+                "gp.exe",
+                "-k",
+                DEFAULT_KEY,
+                "--reader",
+                self.reader_var.get(),
+            ],
         }
 
         if self.os == "Unknown":
@@ -86,35 +100,38 @@ class GPManagerApp:
         self.reader_dropdown = ttk.Combobox(
             self.root, textvariable=self.reader_var, state="readonly"
         )
-        self.reader_dropdown.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.reader_dropdown.grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.reader_dropdown.bind("<<ComboboxSelected>>", self.on_reader_selected)
 
         self.status_label = ttk.Label(self.root, text="Starting...")
         self.status_label.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
+        frame = tk.Frame(root, height=1, bg="gray")
+        frame.grid(row=1, column=0, columnspan=2, sticky="ew")
+
         # Installed Apps List
         self.installed_label = ttk.Label(self.root, text="Installed Apps")
-        self.installed_label.grid(row=1, column=0, padx=5, pady=5)
+        self.installed_label.grid(row=2, column=0, padx=5, pady=5)
 
         self.installed_listbox = tk.Listbox(self.root, height=15, width=40)
-        self.installed_listbox.grid(row=2, column=0, padx=5, pady=5)
+        self.installed_listbox.grid(row=3, column=0, padx=5, pady=5)
 
         self.uninstall_button = ttk.Button(
             self.root, text="Uninstall", command=self.uninstall_app, state=tk.DISABLED
         )
-        self.uninstall_button.grid(row=3, column=0, padx=5, pady=5)
+        self.uninstall_button.grid(row=4, column=0, padx=5, pady=5)
 
         # Available Apps List
         self.available_label = ttk.Label(self.root, text="Available Apps")
-        self.available_label.grid(row=1, column=1, padx=5, pady=5)
+        self.available_label.grid(row=2, column=1, padx=5, pady=5)
 
         self.available_listbox = tk.Listbox(self.root, height=15, width=40)
-        self.available_listbox.grid(row=2, column=1, padx=5, pady=5)
+        self.available_listbox.grid(row=3, column=1, padx=5, pady=5)
 
         self.install_button = ttk.Button(
             self.root, text="Install", command=self.install_app, state=tk.DISABLED
         )
-        self.install_button.grid(row=3, column=1, padx=5, pady=5)
+        self.install_button.grid(row=4, column=1, padx=5, pady=5)
 
     def is_jcop3(self, atr_string):
         result = subprocess.run(
@@ -178,11 +195,15 @@ class GPManagerApp:
         """Detects connected smart card readers."""
         try:
             result = subprocess.run(
-                [*self.gp[self.os], "-r"], capture_output=True, text=True
+                [*self.gp[self.os][0 : 5 if self.os == "posix" else 3], "-r"],
+                capture_output=True,
+                text=True,
             )
 
             readers = [
-                line.strip() for line in result.stdout.splitlines() if line.strip()
+                line.strip().replace("- ", "")
+                for line in result.stdout.splitlines()
+                if line.strip() and "Available" not in line
             ]
 
             if readers:
@@ -199,10 +220,12 @@ class GPManagerApp:
         """Continuously checks for smartcard presence in the background."""
         r = readers()
         if not r:
-            self.update_status("No smartcard reader found.")
+            self.update_status("No smartcard reader found")
             return
 
-        reader = r[0]  # Use the first available reader
+        reader_strings = [str(reader) for reader in r]
+        reader_index = reader_strings.index(self.reader_var.get())
+        reader = r[reader_index]
         connection = reader.createConnection()
 
         while self.running:
@@ -362,7 +385,7 @@ class GPManagerApp:
         if selected and not self.loading:
             app = self.installed_listbox.get(selected[0])
 
-            if "Unknown" in app:
+            if "A000000151535041" in app:
                 self.update_status("You probably don't want to do that.")
                 return
 
