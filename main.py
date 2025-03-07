@@ -23,10 +23,10 @@ class GPManagerApp:
     file_to_aid = {
         "FIDO2.cap": "A0000006472F000101",
         "javacard-memory.cap": "A0000008466D656D6F727901",
-        "keycard.cap": "5361746F4368697000",
+        "keycard.cap": "A0000008040001",
         "openjavacard-ndef-full.cap": "D2760000850101",
         "openjavacard-ndef-tiny.cap": "D2760000850101",
-        "SatoChip.cap": "A00000052721010141504558",
+        "SatoChip.cap": "5361746F4368697000",
         "Satodime.cap": "5361746F44696D6500",
         "SeedKeeper.cap": "536565644B656570657200",
         "SmartPGPApplet-default.cap": "D276000124010304000A000000000000",
@@ -36,7 +36,7 @@ class GPManagerApp:
         "YkHMACApplet.cap": "A000000527200101",
     }
 
-    unsupported_apps = ["FIDO2.cap", "openjavacard-ndef-full.cap"]
+    unsupported_apps = ["FIDO2.cap", "openjavacard-ndef-full.cap", "keycard.cap"]
 
     aid_to_file = {name: aid for aid, name in file_to_aid.items()}
 
@@ -188,7 +188,10 @@ class GPManagerApp:
         reader = r[0]  # Use the first available reader
         connection = reader.createConnection()
 
-        while self.running and not self.loading:
+        while self.running:
+            if self.loading:
+                time.sleep(2)
+                pass
             try:
                 connection.connect(CardConnection.T1_protocol)
                 atr = connection.getATR()
@@ -207,18 +210,17 @@ class GPManagerApp:
                                 f"Memory Free:\t{self.memory["persistent"]["free"]:,} bytes\t({self.memory["persistent"]["percent_free"]:.0%})"
                             )
                         self.card_detected = True
-                        self.update_button_state()
 
                         if not self.card_present:  # First time detecting card
                             self.card_present = True
                             self.get_installed_apps()
-                            self.update_button_state()
+                            self.update_button_state(False)
                             self.update_memory()
 
                 else:  # Card detected but not JCOP
                     self.update_status(f"Card detected, but not JCOP.")
                     self.card_detected = True
-                    self.update_button_state()
+                    self.update_button_state(True)
 
             except Exception:  # No card present
                 self.card_detected = False
@@ -228,32 +230,8 @@ class GPManagerApp:
                 ):  # Only update if it was previously detected
                     self.card_present = False
                     self.update_status("No card present.")
-                    self.update_button_state()
 
             time.sleep(1)  # Polling interval (adjust if needed)
-
-    def detect_reader_and_wait_for_card(self):
-        """Detects card readers and waits for a card to be presented."""
-        try:
-            self.detect_card_readers()
-            if len(self.reader_dropdown["values"]) > 0:
-                self.wait_for_card()
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to detect card readers: {e}")
-
-    def wait_for_card(self):
-        """Waits until a card is presented."""
-        while True:
-            result = subprocess.run(
-                [*self.gp[self.os], "-l"], capture_output=True, text=True
-            )
-            if self.status_label.cget("text") != "Waiting for card...":
-                self.update_status("Waiting for card...")
-            if "No card present" not in result.stdout:
-                self.get_installed_apps()
-                self.install_button["state"] = tk.NORMAL
-                self.uninstall_button["state"] = tk.NORMAL
-                break
 
     def get_installed_apps(self):
         """Fetch installed apps from gp.exe and map AIDs to names."""
@@ -373,12 +351,12 @@ class GPManagerApp:
                 self.update_status("You probably don't want to do that.")
                 return
 
-            self.update_status(f"Uninstalling {app}...")
             aid = self.file_to_aid.get(app)
             if not aid:
                 return
 
             self.set_loading(True)
+            self.update_status(f"Uninstalling {app}...")
 
             file = self.get_app(app)
 
@@ -401,8 +379,6 @@ class GPManagerApp:
                         )
 
                         self.cleanup_app(file)
-
-                print(result)
 
                 if (
                     "Could not delete" not in result.stderr
@@ -429,18 +405,15 @@ class GPManagerApp:
         self.root.after(0, lambda: self.status_label.config(text=text))
         time.sleep(1)
 
-    def update_button_state(self):
-        if self.loading or not self.card_present:
-            self.root.after(0, lambda: self.install_button.config(state=tk.DISABLED))
-            self.root.after(0, lambda: self.uninstall_button.config(state=tk.DISABLED))
-        else:
-            self.root.after(0, lambda: self.install_button.config(state=tk.NORMAL))
-            self.root.after(0, lambda: self.uninstall_button.config(state=tk.NORMAL))
+    def update_button_state(self, disabled: bool):
+        state = tk.DISABLED if disabled else tk.NORMAL
+        self.root.after(0, lambda: self.install_button.config(state=state))
+        self.root.after(0, lambda: self.uninstall_button.config(state=state))
 
     def set_loading(self, loading: bool):
         if loading != self.loading:
             self.loading = loading
-            self.update_button_state()
+        self.update_button_state(loading)
 
     def update_memory(self):
         self.memory = get_memory()
