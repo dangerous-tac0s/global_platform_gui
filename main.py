@@ -12,6 +12,8 @@ import requests
 import threading
 import os
 
+from measure import get_memory
+
 
 def is_jcop3(atr_string):
     jcop3_regex = r"^3B8[0-9A-F]8001[4A4E]{2}[a-zA-Z0-9]{6,20}$"
@@ -57,6 +59,7 @@ class GPManagerApp:
         self.card_detected = False
         self.card_present = False  # Used to track state changes
         self.running = True  # Used to stop the thread if needed
+        self.memory = None
 
         self.os = get_os()
         self.gp = {"posix": ["java", "-jar", "gp.jar"], "nt": ["gp.exe"]}
@@ -186,7 +189,7 @@ class GPManagerApp:
         reader = r[0]  # Use the first available reader
         connection = reader.createConnection()
 
-        while self.running:
+        while self.running and not self.loading:
             try:
                 connection.connect(CardConnection.T1_protocol)
                 atr = connection.getATR()
@@ -195,9 +198,15 @@ class GPManagerApp:
                 if is_jcop3(atr_str):  # JCOP detected
                     if (
                         not self.card_present
-                        or self.status_label.cget("text") != "Card present."
+                        or "Memory Free:" not in self.status_label.cget("text")
+                        or "Card present." not in self.status_label.cget("text")
                     ):
-                        self.update_status(f"Card present.")
+                        if self.memory is None:
+                            self.update_status("Card present.")
+                        else:
+                            self.update_status(
+                                f"Memory Free:\t{self.memory["persistent"]["free"]:,} bytes\t({self.memory["persistent"]["percent_free"]:.0%})"
+                            )
                         self.card_detected = True
                         self.update_button_state()
 
@@ -205,6 +214,7 @@ class GPManagerApp:
                             self.card_present = True
                             self.get_installed_apps()
                             self.update_button_state()
+                            self.update_memory()
 
                 else:  # Card detected but not JCOP
                     self.update_status(f"Card detected, but not JCOP.")
@@ -255,14 +265,14 @@ class GPManagerApp:
         )
         output_lines = result.stdout.splitlines()
 
-        aid_pattern = re.compile(r"APP:\s([A-Fa-f0-9]+)\s\(SELECTABLE\)")
+        aid_pattern = re.compile(r"(APP|Applet):\s+([A-Fa-f0-9]+)")
 
         installed_aids = [
-            match.group(1)
+            match.group(2)
             for line in output_lines
             if (match := aid_pattern.search(line))
         ]
-        installed_aids = [aid for aid in installed_aids if aid != "A0000001515350"]
+        installed_aids = list(set(installed_aids))
         pprint.pprint(self.aid_to_file)
 
         self.installed_apps = [
@@ -289,6 +299,31 @@ class GPManagerApp:
         ]:
             self.available_listbox.insert(tk.END, app)
 
+    def get_app(self, app: str):
+        app_url = f"{self.current_release}/{app}"
+        try:
+            response = requests.get(app_url)
+            if response.status_code == 200:
+                # Save the file locally
+                cap_file_path = app
+                with open(cap_file_path, "wb") as f:
+                    f.write(response.content)
+                print(f"Downloaded {app} to {cap_file_path}")
+                return app
+            else:
+                print(f"Failed to download {app}. Status code: {response.status_code}")
+                return None
+        except requests.RequestException as e:
+            print(f"Error downloading {app}: {e}")
+            return None
+
+    def cleanup_app(self, app: str):
+        if os.path.exists(app):
+            os.remove(app)  # Remove the CAP file after installation
+            print(f"Removed the downloaded file: {app}")
+        else:
+            print(f"CAP file not found for {app}.")
+
     def install_app(self):
         """Installs the selected app."""
         selected = self.available_listbox.curselection()
@@ -301,49 +336,33 @@ class GPManagerApp:
             self.set_loading(True)
 
             self.update_status("Downloading latest version...")
-            app_url = f"{self.current_release}/{app}"
-            try:
-                response = requests.get(app_url)
-                if response.status_code == 200:
-                    # Save the file locally
-                    cap_file_path = app
-                    with open(cap_file_path, "wb") as f:
-                        f.write(response.content)
-                    print(f"Downloaded {app} to {cap_file_path}")
+
+            file = self.get_app(app)
+            if file:
+                self.update_status("Installing app. Keep smartcard on reader.")
+                # Install the app using gp.exe
+                result = subprocess.run(
+                    [*self.gp[self.os], "--install", file],
+                    capture_output=True,
+                    text=True,
+                )
+
+                pprint.pprint(result)
+                if (
+                    "Error:" not in result.stderr
+                    and "Invalid argument" not in result.stderr
+                ):
+                    self.available_apps.remove(app)
+                    self.installed_apps.append(app)
+                    self.update_installed_list()
+                    self.update_status(f"{app} has been installed.")
+                    self.update_available_list()
+                    self.update_memory()
                 else:
-                    print(
-                        f"Failed to download {app}. Status code: {response.status_code}"
-                    )
-                    return  # If download fails, exit the method
-            except requests.RequestException as e:
-                print(f"Error downloading {app}: {e}")
-                return
+                    self.update_status(f"Installation failed.")
+                    print(result.stderr)
 
-            self.update_status("Installing app. Keep smartcard on reader.")
-            # Install the app using gp.exe
-            result = subprocess.run(
-                [*self.gp[self.os], "--install", app], capture_output=True, text=True
-            )
-
-            pprint.pprint(result)
-            if (
-                "Error:" not in result.stderr
-                and "Invalid argument" not in result.stderr
-            ):
-                self.available_apps.remove(app)
-                self.installed_apps.append(app)
-                self.update_installed_list()
-                self.update_status(f"{app} has been installed.")
-                self.update_available_list()
-            else:
-                print(result.stderr)
-                self.update_status(f"Installation failed.")
-
-            if os.path.exists(cap_file_path):
-                os.remove(cap_file_path)  # Remove the CAP file after installation
-                print(f"Removed the downloaded file: {cap_file_path}")
-            else:
-                print(f"CAP file not found for {app}.")
+            self.cleanup_app(app)
 
             self.set_loading(False)
 
@@ -353,6 +372,10 @@ class GPManagerApp:
         if selected and not self.loading:
             app = self.installed_listbox.get(selected[0])
 
+            if "Unknown" in app:
+                self.update_status("You probably don't want to do that.")
+                return
+
             self.update_status(f"Uninstalling {app}...")
             aid = self.file_to_aid.get(app)
             if not aid:
@@ -360,24 +383,19 @@ class GPManagerApp:
 
             self.set_loading(True)
 
-            # Get "From" line to delete app
-            from_result = subprocess.run(
-                [*self.gp[self.os], "-l"],
-                capture_output=True,
-                text=True,
-            )
+            file = self.get_app(app)
 
-            app_pattern = rf"APP:\s*{aid}\s*\(SELECTABLE\)(.*?)From:\s*([\w]+)"
-            match = re.search(app_pattern, from_result.stdout, re.DOTALL)
-
-            if match:
+            if file:
                 result = subprocess.run(
-                    [*self.gp[self.os], "--force", "--delete", match.group(2)],
+                    [*self.gp[self.os], "--uninstall", app],
                     capture_output=True,
                     text=True,
                 )
 
-                if "Could not delete" not in result.stderr:
+                if (
+                    "Could not delete" not in result.stderr
+                    or "App not" not in result.stderr
+                ):
                     if app in self.installed_apps:
                         self.installed_apps.remove(app)
                         self.update_installed_list()
@@ -385,7 +403,9 @@ class GPManagerApp:
                         self.available_apps.append(app)
                         self.update_available_list()
                     self.update_status(f"{app} has been uninstalled.")
-
+                    self.set_loading(False)
+                    self.update_memory()
+                self.cleanup_app(app)
             else:
                 self.update_status("Uninstall failed.")
 
@@ -408,6 +428,9 @@ class GPManagerApp:
         if loading != self.loading:
             self.loading = loading
             self.update_button_state()
+
+    def update_memory(self):
+        self.memory = get_memory()
 
 
 if __name__ == "__main__":
