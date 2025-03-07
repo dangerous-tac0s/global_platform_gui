@@ -114,7 +114,7 @@ class GPManagerApp:
         self.installed_label.grid(row=2, column=0, padx=5, pady=5)
 
         self.installed_listbox = tk.Listbox(self.root, height=15, width=40)
-        self.installed_listbox.grid(row=3, column=0, padx=5, pady=5)
+        self.installed_listbox.grid(row=3, column=0, padx=5, ipady=5)
 
         self.uninstall_button = ttk.Button(
             self.root, text="Uninstall", command=self.uninstall_app, state=tk.DISABLED
@@ -123,15 +123,15 @@ class GPManagerApp:
 
         # Available Apps List
         self.available_label = ttk.Label(self.root, text="Available Apps")
-        self.available_label.grid(row=2, column=1, padx=5, pady=5)
+        self.available_label.grid(row=2, column=1, padx=5, pady=10)
 
         self.available_listbox = tk.Listbox(self.root, height=15, width=40)
-        self.available_listbox.grid(row=3, column=1, padx=5, pady=5)
+        self.available_listbox.grid(row=3, column=1, padx=5, ipady=5)
 
         self.install_button = ttk.Button(
             self.root, text="Install", command=self.install_app, state=tk.DISABLED
         )
-        self.install_button.grid(row=4, column=1, padx=5, pady=5)
+        self.install_button.grid(row=4, column=1, padx=5, pady=10)
 
     def is_jcop3(self, atr_string):
         result = subprocess.run(
@@ -385,8 +385,26 @@ class GPManagerApp:
         if selected and not self.loading:
             app = self.installed_listbox.get(selected[0])
 
-            if "A000000151535041" in app:
-                self.update_status("You probably don't want to do that.")
+            if "Unknown" in app:
+                # Attempt to remove an app that likely came preinstalled
+                self.update_status("Uninstalling...")
+                match = re.search(r"\(([A-Z0-9]+)\)$", app)
+                if match:
+                    aid = match.group(1)
+
+                    result = subprocess.run(
+                        [*self.gp[self.os], "--delete", aid, "--force"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if len(result.stderr) == 0:
+                        if app in self.installed_apps:
+                            self.installed_apps.remove(app)
+                            self.update_installed_list()
+                        self.update_memory()
+                    else:
+                        self.update_status("Unable to uninstall")
+                        print(result.stderr)
                 return
 
             self.set_loading(True)
