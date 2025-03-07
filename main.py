@@ -1,4 +1,3 @@
-import pprint
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -273,7 +272,6 @@ class GPManagerApp:
             if (match := aid_pattern.search(line))
         ]
         installed_aids = list(set(installed_aids))
-        pprint.pprint(self.aid_to_file)
 
         self.installed_apps = [
             self.aid_to_file.get(aid, f"Unknown ({aid})") for aid in installed_aids
@@ -392,9 +390,25 @@ class GPManagerApp:
                     text=True,
                 )
 
+                if app == "FIDO2.cap" and "not present" in result.stderr:
+                    # Probably U2F
+                    file = self.get_app("U2FApplet.cap")
+
+                    if file:
+                        result = subprocess.run(
+                            [*self.gp[self.os], "--uninstall", file],
+                            capture_output=True,
+                            text=True,
+                        )
+
+                        self.cleanup_app(file)
+
+                print(result)
+
                 if (
                     "Could not delete" not in result.stderr
                     or "App not" not in result.stderr
+                    or "not present" not in result.stderr
                 ):
                     if app in self.installed_apps:
                         self.installed_apps.remove(app)
