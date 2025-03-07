@@ -17,11 +17,6 @@ from measure import get_memory
 DEFAULT_KEY = "404142434445464748494A4B4C4D4E4F"
 
 
-def is_jcop3(atr_string):
-    jcop3_regex = r"^3B8[0-9A-F]8001[4A4E]{2}[a-zA-Z0-9]{6,20}$"
-    return bool(re.match(jcop3_regex, atr_string.replace(" ", "")))
-
-
 class GPManagerApp:
     file_to_aid = {
         "FIDO2.cap": "A0000006472F000101",
@@ -59,7 +54,6 @@ class GPManagerApp:
         self.status_queue = queue.Queue()
         self.process_status_messages()
         self.loading = True
-        self.status = ""
         self.card_detected = False
         self.card_present = False  # Used to track state changes
         self.running = True  # Used to stop the thread if needed
@@ -122,10 +116,24 @@ class GPManagerApp:
         )
         self.install_button.grid(row=3, column=1, padx=5, pady=5)
 
+    def is_jcop3(self, atr_string):
+        result = subprocess.run(
+            [*self.gp[self.os], "--info"], capture_output=True, text=True
+        )
+
+        is_v3 = False
+        if len(result.stderr) == 0 or (
+            len(result.stderr) > 0 and "WARN" in result.stderr
+        ):
+            for each in result.stdout.splitlines():
+                if "JavaCard v3" in each:
+                    is_v3 = True
+                    break
+        return is_v3
+
     def on_reader_selected(self, event):
         selected_reader = self.reader_var.get()
         print(f"Selected reader: {selected_reader}")
-        # Add logic here to handle reader selection
 
     def fetch_available_apps(self):
         """Fetch available apps from the latest GitHub release using the API."""
@@ -206,7 +214,7 @@ class GPManagerApp:
                 atr = connection.getATR()
                 atr_str = toHexString(atr)
 
-                if is_jcop3(atr_str):  # JCOP detected
+                if self.is_jcop3(atr_str):  # JCOP detected
                     if (
                         not self.card_present
                         or "Memory Free:" not in self.status_label.cget("text")
@@ -346,7 +354,6 @@ class GPManagerApp:
                     print(result.stderr)
 
             self.cleanup_app(app)
-
             self.set_loading(False)
 
     def uninstall_app(self):
@@ -357,10 +364,6 @@ class GPManagerApp:
 
             if "Unknown" in app:
                 self.update_status("You probably don't want to do that.")
-                return
-
-            aid = self.file_to_aid.get(app)
-            if not aid:
                 return
 
             self.set_loading(True)
@@ -420,7 +423,7 @@ class GPManagerApp:
             self.root.update_idletasks()  # Force immediate UI update
             time.sleep(1)
 
-        self.root.after(100, self.process_status_messages)
+        self.root.after(10, self.process_status_messages)
 
     def update_button_state(self, disable_buttons):
         """Enable or disable buttons immediately based on card presence."""
