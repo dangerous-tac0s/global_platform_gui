@@ -31,3 +31,8 @@ pip install "requirements.txt"
 ```bash
 python main.py
 ```
+
+## Known Issues
+- Reader selection doesn't work
+- U2F will be parsed as FIDO2 under installed apps
+- NDEF tiny will install despite throwing an error but won't be reflected as an installed app until you remove and replace the card
