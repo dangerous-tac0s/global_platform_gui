@@ -1,3 +1,4 @@
+import queue
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -12,6 +13,8 @@ import threading
 import os
 
 from measure import get_memory
+
+DEFAULT_KEY = "404142434445464748494A4B4C4D4E4F"
 
 
 def is_jcop3(atr_string):
@@ -53,6 +56,8 @@ class GPManagerApp:
         # UI Layout
         self.setup_ui()
 
+        self.status_queue = queue.Queue()
+        self.process_status_messages()
         self.loading = True
         self.status = ""
         self.card_detected = False
@@ -61,7 +66,10 @@ class GPManagerApp:
         self.memory = None
 
         self.os = get_os()
-        self.gp = {"posix": ["java", "-jar", "gp.jar"], "nt": ["gp.exe"]}
+        self.gp = {
+            "posix": ["java", "-jar", "gp.jar", "-k", DEFAULT_KEY],
+            "nt": ["gp.exe", "-k", DEFAULT_KEY],
+        }
 
         if self.os == "Unknown":
             messagebox.showerror("Error", f"Unable to determine OS.")
@@ -155,6 +163,7 @@ class GPManagerApp:
         except Exception as e:
             print(f"Error: {e}")
 
+        time.sleep(0.5)
         self.set_loading(False)
 
     def detect_card_readers(self):
@@ -230,6 +239,7 @@ class GPManagerApp:
                 ):  # Only update if it was previously detected
                     self.card_present = False
                     self.update_status("No card present.")
+                    self.update_button_state(True)
 
             time.sleep(1)  # Polling interval (adjust if needed)
 
@@ -249,6 +259,7 @@ class GPManagerApp:
             for line in output_lines
             if (match := aid_pattern.search(line))
         ]
+        # The AID might be matched on multiple lines of the same record
         installed_aids = list(set(installed_aids))
 
         self.installed_apps = [
@@ -284,7 +295,7 @@ class GPManagerApp:
                 cap_file_path = app
                 with open(cap_file_path, "wb") as f:
                     f.write(response.content)
-                print(f"Downloaded {app} to {cap_file_path}")
+                print(f"Downloaded {app}")
                 return app
             else:
                 print(f"Failed to download {app}. Status code: {response.status_code}")
@@ -323,18 +334,15 @@ class GPManagerApp:
                     text=True,
                 )
 
-                if (
-                    "Error:" not in result.stderr
-                    and "Invalid argument" not in result.stderr
-                ):
+                if len(result.stderr) == 0:
                     self.available_apps.remove(app)
                     self.installed_apps.append(app)
                     self.update_installed_list()
-                    self.update_status(f"{app} has been installed.")
+                    self.update_status(f"{app} has been installed")
                     self.update_available_list()
                     self.update_memory()
                 else:
-                    self.update_status(f"Installation failed.")
+                    self.update_status("Installation failed")
                     print(result.stderr)
 
             self.cleanup_app(app)
@@ -380,40 +388,51 @@ class GPManagerApp:
 
                         self.cleanup_app(file)
 
-                if (
-                    "Could not delete" not in result.stderr
-                    or "App not" not in result.stderr
-                    or "not present" not in result.stderr
-                ):
+                if len(result.stderr) == 0:
                     if app in self.installed_apps:
                         self.installed_apps.remove(app)
                         self.update_installed_list()
                     if app not in self.available_apps:
                         self.available_apps.append(app)
                         self.update_available_list()
-                    self.update_status(f"{app} has been uninstalled.")
+                    self.update_status(f"{app} has been uninstalled")
                     self.set_loading(False)
                     self.update_memory()
+                else:
+                    # The actual gp -uninstall command
+                    self.update_status("Uninstall failed during uninstallation")
+                    print(result.stderr)
                 self.cleanup_app(app)
             else:
-                self.update_status("Uninstall failed.")
+                self.update_status("Uninstall failed: cap file not downloaded")
 
             self.set_loading(False)
 
-    def update_status(self, text):
-        """Update the Tkinter label safely from another thread."""
-        self.root.after(0, lambda: self.status_label.config(text=text))
-        time.sleep(1)
+    def update_status(self, message):
+        """Queue a status message to be processed in the main thread."""
+        self.status_queue.put(message)
 
-    def update_button_state(self, disabled: bool):
-        state = tk.DISABLED if disabled else tk.NORMAL
-        self.root.after(0, lambda: self.install_button.config(state=state))
-        self.root.after(0, lambda: self.uninstall_button.config(state=state))
+    def process_status_messages(self):
+        """Process queued status messages to update the UI immediately."""
+        while not self.status_queue.empty():
+            message = self.status_queue.get()
+            self.status_label.config(text=message)
+            self.root.update_idletasks()  # Force immediate UI update
+            time.sleep(1)
+
+        self.root.after(100, self.process_status_messages)
+
+    def update_button_state(self, disable_buttons):
+        """Enable or disable buttons immediately based on card presence."""
+        state = tk.DISABLED if disable_buttons else tk.NORMAL
+        self.install_button.config(state=state)
+        self.uninstall_button.config(state=state)
+        self.root.update_idletasks()  # Force UI refresh
 
     def set_loading(self, loading: bool):
-        if loading != self.loading:
-            self.loading = loading
-        self.update_button_state(loading)
+        # if loading != self.loading:
+        self.loading = loading
+        self.update_button_state(loading if self.card_present else True)
 
     def update_memory(self):
         self.memory = get_memory()
