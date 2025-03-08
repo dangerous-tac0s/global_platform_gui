@@ -13,6 +13,7 @@ import threading
 import os
 
 from measure import get_memory
+from ndef_dialog import NDEFDialog
 
 DEFAULT_KEY = "404142434445464748494A4B4C4D4E4F"
 
@@ -23,7 +24,7 @@ class GPManagerApp:
         "javacard-memory.cap": "A0000008466D656D6F727901",
         "keycard.cap": "A0000008040001",
         "openjavacard-ndef-full.cap": "D2760000850101",
-        "openjavacard-ndef-tiny.cap": "D2760000850101",
+        # "openjavacard-ndef-tiny.cap": "D2760000850101",
         "SatoChip.cap": "5361746F4368697000",
         "Satodime.cap": "5361746F44696D6500",
         "SeedKeeper.cap": "536565644B656570657200",
@@ -34,7 +35,7 @@ class GPManagerApp:
         "YkHMACApplet.cap": "A000000527200101",
     }
 
-    unsupported_apps = ["FIDO2.cap", "openjavacard-ndef-full.cap", "keycard.cap"]
+    unsupported_apps = ["FIDO2.cap", "openjavacard-ndef-tiny.cap", "keycard.cap"]
 
     aid_to_file = {name: aid for aid, name in file_to_aid.items()}
 
@@ -175,6 +176,11 @@ class GPManagerApp:
                 self.current_release = "/".join(chunked)
 
                 self.available_apps = [link.split("/")[-1] for link in cap_files]
+                self.available_apps = [
+                    link
+                    for link in self.available_apps
+                    if link not in self.unsupported_apps
+                ]
                 self.update_available_list()
                 self.update_status(
                     f"Available apps fetched: {len(self.available_apps) if len(self.available_apps) > 0 else 'None'}"
@@ -358,10 +364,17 @@ class GPManagerApp:
 
             file = self.get_app(app)
             if file:
+                install_command = [*self.gp[self.os], "--install", file]
+                if "ndef" in app:
+                    res = self.open_ndef_dialog()
+                    print(f"Params string: {res}")
+                    install_command.append("--params")
+                    install_command.append(res)
+
                 self.update_status("Installing app. Keep smartcard on reader.")
                 # Install the app using gp.exe
                 result = subprocess.run(
-                    [*self.gp[self.os], "--install", file],
+                    install_command,
                     capture_output=True,
                     text=True,
                 )
@@ -481,6 +494,12 @@ class GPManagerApp:
 
     def update_memory(self):
         self.memory = get_memory()
+
+    def open_ndef_dialog(self):
+        dialog = NDEFDialog(root)
+        root.wait_window(dialog)
+
+        return f"810200008202{(int(dialog.result[0:-2])*1024 - (0 if dialog.result != "32kB" else 1)):04X}"
 
 
 if __name__ == "__main__":
