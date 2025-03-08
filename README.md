@@ -53,9 +53,6 @@ Just search for "Python" and add the latest version
 ![image|690x404](https://dangerousthings-forum.b-cdn.net/original/3X/b/9/b9ef33a4fc192e04d50733a4f186ccfbc4daf470.jpeg)
 
 ### Step 1 Download
-Follow @tac0s link
-https://github.com/dangerous-tac0s/global_platform_gui
-
 
 
 ![image|690x282](https://dangerousthings-forum.b-cdn.net/original/3X/e/c/ecfcf22c88bb26c2396afd43b44f0133f5dc7172.jpeg)
@@ -73,16 +70,17 @@ You need to know the path in order to run the Global platform
 
 
 ![image|690x365](https://dangerousthings-forum.b-cdn.net/original/3X/2/e/2e62af7ea8d134b7e0c2fc180f09e43053726263.png)
+
  So my path will be 
 
 \Working\DT\global_platform_gui-master (copy yours to your clipboard now)
 
 
 ### Step 3 Open Command Prompt (many ways to do this, here is one)
-Type cmd into search
-![image|363x86](https://dangerousthings-forum.b-cdn.net/original/3X/f/0/f0c491eab0df850827ebfce0c53f0ebfe7398b57.jpeg)
 
-![image|517x442](https://dangerousthings-forum.b-cdn.net/original/3X/a/4/a4508198359a1a829fc4ae31973c1bdcf75e2244.png)
+Type cmd into search
+
+![image|363x86](https://dangerousthings-forum.b-cdn.net/original/3X/f/0/f0c491eab0df850827ebfce0c53f0ebfe7398b57.jpeg)
 
 
 ### Step 4 Change Directory
@@ -104,7 +102,9 @@ You are now in that directory
 ### Step 5 Running Global Platform
 
  first we need to install the requirements
-`pip install -r "requirements.txt"`
+```bash
+pip install -r "requirements.txt"
+```
 
 
 
@@ -116,7 +116,9 @@ Wait ~10 secs
 ** First Plug your reader in NOW if you haven’t already(No reader you will get an error, you will have to close the program and run it again)** 
 
 Run the program
-`python main.py`
+```bash
+python main.py
+```
 
 
 
@@ -127,8 +129,7 @@ You will see the attached reader (ACR122U in my case)
 
 ![image|633x466](https://dangerousthings-forum.b-cdn.net/original/3X/c/2/c215fa0e6951c46903b6986156592e5910a17fa2.png)
 
-You will also see the installed apps on the left ( This is my j3r180 test card )
-https://dangerousthings.com/product/j3r180-test-card/
+You will also see the installed apps on the left [This is my j3r180 test card](https://dangerousthings.com/product/j3r180-test-card/)
 
 Then the same card after I installed an applet
 
