@@ -1,7 +1,7 @@
 # Global Platform GUI
 A quick attempt at GUI wrapper for [Global Platform Pro](https://github.com/martinpaljak/GlobalPlatformPro) by 
 [Martin Paljak](https://github.com/martinpaljak) geared towards the [flexSecure](https://dngr.us/flexsecure).
-Tons of credit go to @Stargate01, [@GrimEcho](https://forum.dangerousthings.com/u/grimecho/summary), and [@pilgrimsmaster](https://forum.dangerousthings.com/u/pilgrimsmaster/summary).
+Tons of credit go to [@Stargate01](https://github.com/stargate01), [@GrimEcho](https://forum.dangerousthings.com/u/grimecho/summary), and [@pilgrimsmaster](https://forum.dangerousthings.com/u/pilgrimsmaster/summary).
 
 Looking for more information? Checkout the [flexSecure repo docs](https://github.com/DangerousThings/flexsecure-applets/tree/master/docs).
 
@@ -15,6 +15,7 @@ Features:
 - Installs the latest version of an app
 - Can uninstall apps
 - Will probably break at random
+- Supports basic NDEF installation (selectable container size: 1-32kB)
 
 Want a feature? Feel free to submit a PR.
 
@@ -23,8 +24,6 @@ Want a feature? Feel free to submit a PR.
 ## Known Issues
 - Reader selection doesn't work
 - U2F will be parsed as FIDO2 under installed apps
-- NDEF tiny will install despite throwing an error but won't be reflected as an installed app until you remove and replace the card
-
 
 ## Quick Start
 
