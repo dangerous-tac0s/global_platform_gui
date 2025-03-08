@@ -52,20 +52,33 @@ class GPManagerApp:
         # UI Layout
         self.setup_ui()
 
+        self.os = get_os()
+
         # Get status label width
         self.root.update_idletasks()
-        self.status_label_width = self.status_label.winfo_width() - 20 # Account for x padding
+        # Account for x padding
+        self.status_label_width = (
+            self.status_label.winfo_width() - 20 if self.os == "nt" else 0
+        )
         self.status_label.config(width=self.status_label_width)
 
         self.status_queue = queue.Queue()
         self.process_status_messages()
+        self.memory = None
+
         self.loading = True
         self.card_detected = False
         self.card_present = False  # Used to track state changes
         self.running = True  # Used to stop the thread if needed
-        self.memory = None
 
-        self.os = get_os()
+        if self.os == "Unknown":
+            messagebox.showerror("Error", f"Unable to determine OS.")
+
+        self.current_release = None
+        # Data Containers
+        self.installed_apps = []
+        self.available_apps = []
+
         self.gp = {
             "posix": [
                 "java",
@@ -85,29 +98,17 @@ class GPManagerApp:
             ],
         }
 
-        if self.os == "Unknown":
-            messagebox.showerror("Error", f"Unable to determine OS.")
-
-        # Data Containers
-        self.installed_apps = []
-        self.available_apps = []
-
-        self.current_release = None
-
         # Startup Processes
         self.fetch_available_apps()
-
         self.detect_card_readers()
-        while len(self.reader_var.get()) == 0:
-            time.sleep(1)
-            self.detect_card_readers()
+
         self.card_thread = threading.Thread(target=self.detect_card_loop, daemon=True)
         self.card_thread.start()
 
     def setup_ui(self):
         self.reader_var = tk.StringVar()
         self.reader_dropdown = ttk.Combobox(
-            self.root, textvariable=self.reader_var, state="readonly"
+            self.root, textvariable=self.reader_var, state=tk.DISABLED
         )
         self.reader_dropdown.grid(row=0, column=0, padx=5, pady=5, sticky="e")
         self.reader_dropdown.bind("<<ComboboxSelected>>", self.on_reader_selected)
@@ -202,11 +203,10 @@ class GPManagerApp:
         except Exception as e:
             print(f"Error: {e}")
 
-        time.sleep(0.5)
         self.set_loading(False)
 
-    def detect_card_readers(self):
-        """Detects connected smart card readers."""
+    def detect_card_readers(self, retry=True, delay=2000):
+        """Detects connected smart card readers. Retries if none are found."""
         try:
             result = subprocess.run(
                 # Slice the command to exclude the selected reader as we are getting our options now
@@ -221,25 +221,47 @@ class GPManagerApp:
                 if line.strip() and "Available" not in line
             ]
 
-            if reader_list:
+            if reader_list and len(reader_list) > 0:
                 self.reader_dropdown["values"] = reader_list
+                self.reader_dropdown.config(state="readonly")
                 self.reader_var.set(reader_list[0])  # Select first reader by default
+                self.update_status(f"Reader detected: {reader_list[0]}")
+
+                if not self.running:
+                    self.running = True
+                    self.card_thread = threading.Thread(
+                        target=self.detect_card_loop, daemon=True
+                    )
+                    self.card_thread.start()
             else:
-                messagebox.showwarning(
-                    "No Readers Found", "No smart card readers detected."
-                )
+                if len(self.reader_dropdown["values"]) != 0:
+                    self.reader_dropdown.config(state=tk.DISABLED)
+                    self.reader_dropdown["values"] = []
+                    self.reader_var.set("")
+                if "No readers" not in self.status_label.cget("text"):
+                    self.update_status("No readers found")
+                if retry:
+                    self.root.after(
+                        delay, self.detect_card_readers
+                    )  # Retry after delay
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to detect card readers: {e}")
+            if "No readers" not in self.status_label.cget("text"):
+                self.update_status("No readers found")
+            print(f"Error detecting card readers: {e}")
+            if retry:
+                self.root.after(delay, self.detect_card_readers)  # Retry after delay
 
     def detect_card_loop(self):
         """Continuously checks for smartcard presence in the background."""
         r = readers()
-        if not r:
-            self.update_status("No smartcard reader found")
+        if len(r) == 0:
+            self.detect_card_readers()
+            self.running = False
             return
 
         reader_strings = [str(reader) for reader in r]
-        reader_index = reader_strings.index(self.reader_var.get())
+        selected_reader = self.reader_var.get()
+        reader_index = reader_strings.index(selected_reader)
         reader = r[reader_index]
         connection = reader.createConnection()
 
@@ -247,6 +269,13 @@ class GPManagerApp:
             if self.loading:
                 time.sleep(2)
                 pass
+
+            r = readers()
+            if len(r) == 0:
+                self.detect_card_readers()
+                self.running = False
+                return
+
             try:
                 connection.connect(CardConnection.T1_protocol)
                 atr = connection.getATR()
@@ -501,7 +530,7 @@ class GPManagerApp:
         if self.install_button.cget("state") != state:
             self.install_button.config(state=state)
             self.uninstall_button.config(state=state)
-            self.root.update_idletasks()  
+            self.root.update_idletasks()
 
     def set_loading(self, loading: bool):
         if loading != self.loading:
@@ -516,6 +545,19 @@ class GPManagerApp:
         root.wait_window(dialog)
 
         return dialog.result
+
+
+def no_card_reader_warning():
+    def on_retry():
+        warning_window.destroy()
+
+    def on_quit():
+        root.quit()
+
+    warning_window = tk.Toplevel(root)
+    warning_window.title("Warning: smartcard reader not found")
+    warning_window.geometry("300x150")
+    warning_window.resizable(False, False)
 
 
 if __name__ == "__main__":

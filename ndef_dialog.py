@@ -12,7 +12,6 @@ class NDEFDialog(tk.Toplevel):
 
         self.title("Select an Option")
         self.geometry("300x180")
-        # self.transient(self)
         self.grab_set()
 
         self.result = None
@@ -51,7 +50,29 @@ class NDEFDialog(tk.Toplevel):
         size_in_bytes = size * 1024
         if size == 32:  # 32kB is 8000--highest we can go is 7FFF
             size_in_bytes -= 1
+        """
+        80      -> Data Initial
+                XX  -> Length
+                X+  -> Data in hex
+                
+        Container will be sized to this record if Data Size is not provided.
+        """
+        """
+        81 02   -> Data Access
+        Options:
+                00  ->  Open Access
+                FF  ->  No Access
+                F1  ->  Write Once
+                F0  ->  Contact Only
+        """
+        read_permissions = "00"
         write_permissions = "00" if self.write_once_value.get() == 0 else "F1"
+        """
+        82 02   -> Data Size
+            XX XX   -> Size of container in bytes--in hex. 0100 to 7FFF
+        """
 
-        self.result = f"810200{write_permissions}8202{size_in_bytes:04X}"
+        self.result = (
+            f"8102{read_permissions}{write_permissions}8202{size_in_bytes:04X}"
+        )
         self.destroy()
