@@ -19,7 +19,7 @@ Features:
 
 Want a feature? Feel free to submit a PR.
 
-<img src="screenshot.png" width="50%"/>
+<img src="screenshot.png" width=350/>
 
 ## Known Issues
 - Reader selection doesn't work
@@ -49,14 +49,14 @@ This guide was made after a whopping two hours invested. Many improvements have 
 You can grab Python from the Microsoft store.
 Just search for "Python" and add the latest version
 
-![image|690x404](https://dangerousthings-forum.b-cdn.net/original/3X/b/9/b9ef33a4fc192e04d50733a4f186ccfbc4daf470.jpeg)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/b/9/b9ef33a4fc192e04d50733a4f186ccfbc4daf470.jpeg" width=350 />
 
 ### Step 1 Download
 
 
-![image|690x282](https://dangerousthings-forum.b-cdn.net/original/3X/e/c/ecfcf22c88bb26c2396afd43b44f0133f5dc7172.jpeg)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/e/c/ecfcf22c88bb26c2396afd43b44f0133f5dc7172.jpeg" width=350 />
 
-![image|690x174](https://dangerousthings-forum.b-cdn.net/original/3X/6/8/687fb48f645f5d825fcbcbc69deb0213bf1f17bd.png)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/6/8/687fb48f645f5d825fcbcbc69deb0213bf1f17bd.png" width=350 />
 
 Direct it to where you want to save it
 Here is mine
@@ -67,8 +67,7 @@ This bit looks simple (and it is) but it is also important
 You need to know the path in order to run the Global platform
 
 
-
-![image|690x365](https://dangerousthings-forum.b-cdn.net/original/3X/2/e/2e62af7ea8d134b7e0c2fc180f09e43053726263.png)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/2/e/2e62af7ea8d134b7e0c2fc180f09e43053726263.png" width=350 />
 
  So my path will be 
 
@@ -79,7 +78,8 @@ You need to know the path in order to run the Global platform
 
 Type cmd into search
 
-![image|363x86](https://dangerousthings-forum.b-cdn.net/original/3X/f/0/f0c491eab0df850827ebfce0c53f0ebfe7398b57.jpeg)
+
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/f/0/f0c491eab0df850827ebfce0c53f0ebfe7398b57.jpeg" width=350 />
 
 
 ### Step 4 Change Directory
@@ -89,14 +89,13 @@ eg
 
 
 
-
-![image|690x82](https://dangerousthings-forum.b-cdn.net/original/3X/a/4/a4508198359a1a829fc4ae31973c1bdcf75e2244.png)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/a/4/a4508198359a1a829fc4ae31973c1bdcf75e2244.png" width=350 />
 
 
 
 You are now in that directory
 
-![image|690x50](https://dangerousthings-forum.b-cdn.net/original/3X/8/0/802c6d0fe0e15d74dbc1e4ee020d44b9f8c4e9c1.png)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/8/0/802c6d0fe0e15d74dbc1e4ee020d44b9f8c4e9c1.png" width=350 />
 
 ### Step 5 Running Global Platform
 
@@ -112,7 +111,7 @@ Wait ~10 secs
  you should see a bunch of successful script and the prompt waiting for the next command
 
 
-** First Plug your reader in NOW if you haven’t already(No reader you will get an error, you will have to close the program and run it again)** 
+** First Plug your reader in <s>NOW</s> if you haven’t already(No reader you will get an error<s>, you will have to close the program and run it again</s>)** 
 
 Run the program
 ```bash
@@ -124,26 +123,24 @@ python main.py
 
 You will see the attached reader (ACR122U in my case)
 
-
-
-![image|633x466](https://dangerousthings-forum.b-cdn.net/original/3X/c/2/c215fa0e6951c46903b6986156592e5910a17fa2.png)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/c/2/c215fa0e6951c46903b6986156592e5910a17fa2.png" width=350 />
 
 You will also see the installed apps on the left [This is my j3r180 test card](https://dangerousthings.com/product/j3r180-test-card/)
 
 Then the same card after I installed an applet
 
-![image|632x471](https://dangerousthings-forum.b-cdn.net/original/3X/b/a/bab483eb9c775e2d3edd8cd17647852d2c011892.png)
+<img src="https://dangerousthings-forum.b-cdn.net/original/3X/b/a/bab483eb9c775e2d3edd8cd17647852d2c011892.png" width=350 />
 
 I'm sure @tac0s will admit this is still a work in progress
 eg, 
 * currently there are some applets that won't install...yet
-* you won't see success or failure notifications unless you are looking at the cmd prompt window
-* you'll have to re-run the program to refresh it to see the changes on the Global Program
+* <s>you won't see success or failure notifications unless you are looking at the cmd prompt window</s>
+* <s>you'll have to re-run the program to refresh it to see the changes on the Global Program</s>
 etc.
 
 But as things are fixed/ added/ changed etc. 
 a simple `git pull` should update
 
-As mentioned this is a work in progress, HOWEVER in my opinion, This is far easier than the current method and opens up the FlexSecure to even more people
+As mentioned this is a work in progress, HOWEVER in my opinion, This is far easier than the current method and opens up the FlexSecure to even more people.
 
 Hopefully this guide will be easy to follow, just ask if you get stuck (ie. I may have fucked something up)

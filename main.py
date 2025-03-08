@@ -93,6 +93,9 @@ class GPManagerApp:
         self.fetch_available_apps()
 
         self.detect_card_readers()
+        while len(self.reader_var.get()) == 0:
+            time.sleep(1)
+            self.detect_card_readers()
         self.card_thread = threading.Thread(target=self.detect_card_loop, daemon=True)
         self.card_thread.start()
 
