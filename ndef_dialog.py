@@ -3,11 +3,15 @@ from tkinter import ttk
 
 
 class NDEFDialog(tk.Toplevel):
+    """
+    This returns the params for openNDEF-full
+    """
+
     def __init__(self, parent):
         super().__init__(parent)
 
         self.title("Select an Option")
-        self.geometry("300x150")
+        self.geometry("300x180")
         # self.transient(self)
         self.grab_set()
 
@@ -24,6 +28,12 @@ class NDEFDialog(tk.Toplevel):
         )
         self.dropdown.pack(pady=5)
 
+        self.write_once_value = tk.IntVar()
+        self.checkbox = tk.Checkbutton(
+            self, text="Write Once", variable=self.write_once_value
+        )
+        self.checkbox.pack(pady=5)
+
         self.button_frame = tk.Frame(self)
         self.button_frame.pack(pady=10)
 
@@ -37,5 +47,11 @@ class NDEFDialog(tk.Toplevel):
         ).pack(side=tk.RIGHT, padx=5)
 
     def on_ok(self):
-        self.result = self.selected_value.get()
+        size = int(self.selected_value.get()[0:-2])
+        size_in_bytes = size * 1024
+        if size == 32:  # 32kB is 8000--highest we can go is 7FFF
+            size_in_bytes -= 1
+        write_permissions = "00" if self.write_once_value.get() == 0 else "F1"
+
+        self.result = f"810200{write_permissions}8202{size_in_bytes:04X}"
         self.destroy()

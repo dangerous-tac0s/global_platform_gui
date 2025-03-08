@@ -502,7 +502,7 @@ class GPManagerApp:
         dialog = NDEFDialog(root)
         root.wait_window(dialog)
 
-        return f"810200008202{(int(dialog.result[0:-2])*1024 - (0 if dialog.result != "32kB" else 1)):04X}"
+        return dialog.result
 
 
 if __name__ == "__main__":
