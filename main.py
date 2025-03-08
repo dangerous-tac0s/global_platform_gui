@@ -24,7 +24,7 @@ class GPManagerApp:
         "javacard-memory.cap": "A0000008466D656D6F727901",
         "keycard.cap": "A0000008040001",
         "openjavacard-ndef-full.cap": "D2760000850101",
-        # "openjavacard-ndef-tiny.cap": "D2760000850101",
+        "openjavacard-ndef-tiny.cap": "D2760000850101",
         "SatoChip.cap": "5361746F4368697000",
         "Satodime.cap": "5361746F44696D6500",
         "SeedKeeper.cap": "536565644B656570657200",
@@ -69,7 +69,7 @@ class GPManagerApp:
         self.loading = True
         self.card_detected = False
         self.card_present = False  # Used to track state changes
-        self.running = True  # Used to stop the thread if needed
+        self.running = False  # Used to stop the thread if needed
 
         if self.os == "Unknown":
             messagebox.showerror("Error", f"Unable to determine OS.")
@@ -101,9 +101,6 @@ class GPManagerApp:
         # Startup Processes
         self.fetch_available_apps()
         self.detect_card_readers()
-
-        self.card_thread = threading.Thread(target=self.detect_card_loop, daemon=True)
-        self.card_thread.start()
 
     def setup_ui(self):
         self.reader_var = tk.StringVar()
@@ -224,9 +221,16 @@ class GPManagerApp:
             if reader_list and len(reader_list) > 0:
                 self.reader_dropdown["values"] = reader_list
                 self.reader_dropdown.config(state="readonly")
-                self.reader_var.set(reader_list[0])  # Select first reader by default
+
+                # Was this a retry? Is our previously selected reader still present?
+                if self.reader_var.get() not in reader_list:
+                    # Not a retry or old reader not connected
+                    self.reader_var.set(
+                        reader_list[0]
+                    )  # Select first reader by default
                 self.update_status(f"Reader detected: {reader_list[0]}")
 
+                # If the card detection thread isn't running, start it
                 if not self.running:
                     self.running = True
                     self.card_thread = threading.Thread(
@@ -254,9 +258,10 @@ class GPManagerApp:
     def detect_card_loop(self):
         """Continuously checks for smartcard presence in the background."""
         r = readers()
+        # No readers found on app startup
         if len(r) == 0:
-            self.detect_card_readers()
             self.running = False
+            self.detect_card_readers()
             return
 
         reader_strings = [str(reader) for reader in r]
@@ -266,12 +271,14 @@ class GPManagerApp:
         connection = reader.createConnection()
 
         while self.running:
+            # App is doing something--don't step on its updates
             if self.loading:
                 time.sleep(2)
                 pass
 
             r = readers()
-            if len(r) == 0:
+            # Readers connected have changed -- recheck
+            if len(r) != len(self.reader_dropdown["values"]):
                 self.detect_card_readers()
                 self.running = False
                 return
@@ -545,19 +552,6 @@ class GPManagerApp:
         root.wait_window(dialog)
 
         return dialog.result
-
-
-def no_card_reader_warning():
-    def on_retry():
-        warning_window.destroy()
-
-    def on_quit():
-        root.quit()
-
-    warning_window = tk.Toplevel(root)
-    warning_window.title("Warning: smartcard reader not found")
-    warning_window.geometry("300x150")
-    warning_window.resizable(False, False)
 
 
 if __name__ == "__main__":
