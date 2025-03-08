@@ -52,6 +52,11 @@ class GPManagerApp:
         # UI Layout
         self.setup_ui()
 
+        # Get status label width
+        self.root.update_idletasks()
+        self.status_label_width = self.status_label.winfo_width() - 20 # Account for x padding
+        self.status_label.config(width=self.status_label_width)
+
         self.status_queue = queue.Queue()
         self.process_status_messages()
         self.loading = True
@@ -257,7 +262,7 @@ class GPManagerApp:
                             self.update_status("Card present.")
                         else:
                             self.update_status(
-                                f"Memory Free:\t{self.memory["persistent"]["free"]:,} bytes\t({self.memory["persistent"]["percent_free"]:.0%})"
+                                f"Memory Free: {self.memory["persistent"]["free"]/1024:.0f}kB -- ({self.memory["persistent"]["percent_free"]:.0%})"
                             )
                         self.card_detected = True
 
@@ -364,17 +369,24 @@ class GPManagerApp:
             self.set_loading(True)
 
             self.update_status("Downloading latest version...")
-
             file = self.get_app(app)
+            self.update_status("Keep smartcard on reader!")
+
             if file:
                 install_command = [*self.gp[self.os], "--install", file]
                 if "ndef" in app:
                     res = self.open_ndef_dialog()
+
+                    # Cancel was pressed
+                    if not res:
+                        self.cleanup_app(app)
+                        return
+
+                    # Updating command with params
                     print(f"Params string: {res}")
                     install_command.append("--params")
                     install_command.append(res)
 
-                self.update_status("Installing app. Keep smartcard on reader.")
                 # Install the app using gp.exe
                 result = subprocess.run(
                     install_command,
@@ -386,7 +398,7 @@ class GPManagerApp:
                     self.available_apps.remove(app)
                     self.installed_apps.append(app)
                     self.update_installed_list()
-                    self.update_status(f"{app} has been installed")
+                    self.update_status(f"{app} installed")
                     self.update_available_list()
                     self.update_memory()
                 else:
@@ -456,16 +468,16 @@ class GPManagerApp:
                     if app not in self.available_apps:
                         self.available_apps.append(app)
                         self.update_available_list()
-                    self.update_status(f"{app} has been uninstalled")
+                    self.update_status(f"{app} uninstalled")
                     self.set_loading(False)
                     self.update_memory()
                 else:
                     # The actual gp -uninstall command
-                    self.update_status("Uninstall failed during uninstallation")
+                    self.update_status("Error during uninstallation")
                     print(result.stderr)
                 self.cleanup_app(app)
             else:
-                self.update_status("Uninstall failed: cap file not downloaded")
+                self.update_status("Unable to get cap file")
 
             self.set_loading(False)
 
@@ -477,8 +489,8 @@ class GPManagerApp:
         """Process queued status messages to update the UI immediately."""
         while not self.status_queue.empty():
             message = self.status_queue.get()
-            self.status_label.config(text=message)
-            self.root.update_idletasks()  # Force immediate UI update
+            self.status_label.config(text=f"{message:<{self.status_label_width}}")
+            self.root.update_idletasks()  #
             time.sleep(1)
 
         self.root.after(10, self.process_status_messages)
@@ -486,13 +498,14 @@ class GPManagerApp:
     def update_button_state(self, disable_buttons):
         """Enable or disable buttons immediately based on card presence."""
         state = tk.DISABLED if disable_buttons else tk.NORMAL
-        self.install_button.config(state=state)
-        self.uninstall_button.config(state=state)
-        self.root.update_idletasks()  # Force UI refresh
+        if self.install_button.cget("state") != state:
+            self.install_button.config(state=state)
+            self.uninstall_button.config(state=state)
+            self.root.update_idletasks()  
 
     def set_loading(self, loading: bool):
-        # if loading != self.loading:
-        self.loading = loading
+        if loading != self.loading:
+            self.loading = loading
         self.update_button_state(loading if self.card_present else True)
 
     def update_memory(self):
