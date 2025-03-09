@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
+import ndef
+import mimetypes
 
 
 class NDEFDialog(tk.Toplevel):
@@ -37,6 +39,7 @@ class NDEFDialog(tk.Toplevel):
 
         # Add tabs
         self.notebook.add(BasicTab(self.notebook, self), text="Basic")
+        self.notebook.add(RecordTab(self.notebook, self), text="Record")
         self.notebook.add(AdvancedTab(self.notebook, self), text="Advanced")
 
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_change)
@@ -64,7 +67,7 @@ class NDEFDialog(tk.Toplevel):
             if selected_tab_text == "basic":
                 # print("basic")
                 pass
-            elif selected_tab_text == "data":
+            elif selected_tab_text == "record":
                 # print("data")
                 pass
             elif selected_tab_text == "advanced":
@@ -98,7 +101,7 @@ class BasicTab(ttk.Frame):
 
         self.controller = controller
 
-        label = tk.Label(self, text="Choose an option:")
+        label = tk.Label(self, text="Container Size:")
         label.pack(pady=10)
 
         options = ["1kB", "2kB", "4kB", "8kB", "16kB", "32kB"]
@@ -126,6 +129,110 @@ class BasicTab(ttk.Frame):
                 "00" if self.write_once_value.get() == 0 else "F1"
             ]
         )
+
+
+class RecordTab(ttk.Frame):
+    record_types = [
+        "text",
+        "uri",
+        "mime",
+        "smart poster",
+        "external",
+        "signature",
+        "bluetooth",
+        "actionable",
+        "empty",
+    ]
+    record_types.sort()
+
+    def create_text_record(text, language="en"):
+        """
+        Creates a text record with the specified text and language.
+        """
+        return ndef.TextRecord(language=language, text=text)
+
+    def create_uri_record(uri):
+        """
+        Creates a URI record with the specified URI.
+        """
+        return ndef.URIRecord(uri=uri)
+
+    def create_mime_record(mime_type, data):
+        """
+        Creates a MIME record with the specified MIME type and binary data.
+        """
+        return ndef.MIMERecord(mime_type=mime_type, data=data)
+
+    def create_smart_poster_record(uri, title=None, description=None):
+        """
+        Creates a smart poster record with an optional title and description.
+        This is typically a URI with optional text records.
+        """
+        record = ndef.URIRecord(uri=uri)
+        if title:
+            record.add(ndef.TextRecord(language="en", text=title))
+        if description:
+            record.add(ndef.TextRecord(language="en", text=description))
+        return record
+
+    def create_bluetooth_record(bluetooth_address):
+        """
+        Creates a Bluetooth record with the specified Bluetooth address.
+        """
+        return ndef.ExternalRecord(
+            type="urn:nfc:wkt:bt", data=bluetooth_address.encode("utf-8")
+        )
+
+    def create_mime_record(mime_type, binary_data):
+        """
+        Creates a MIME record that can hold binary data such as a file.
+        """
+        return ndef.MIMERecord(mime_type=mime_type, data=binary_data)
+
+    # 7. Create an External Type Record
+    def create_external_record(type_name, data):
+        """
+        Creates an external type record with the specified type name and data.
+        """
+        return ndef.ExternalRecord(type=type_name, data=data)
+
+    def create_empty_record():
+        """
+        Creates an empty NDEF record, often used as a placeholder.
+        """
+        return ndef.TextRecord(
+            language="en", text=""
+        )  # Using a blank text record as "empty"
+
+    def create_actionable_payload(action_type, action_data):
+        """
+        Creates a record that triggers an action on the receiving device.
+        """
+        return ndef.ExternalRecord(type=action_type, data=action_data.encode("utf-8"))
+
+    def create_signature_record(data, signature):
+        """
+        Creates a signature record to verify the integrity of the data.
+        This would include the original data and a cryptographic signature.
+        """
+        return ndef.ExternalRecord(
+            type="urn:nfc:wkt:sig", data=signature.encode("utf-8")
+        )
+
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        self.grid_columnconfigure(0, weight=1, uniform="equal")
+        self.grid_columnconfigure(1, weight=1, uniform="equal")
+
+        record_type_label = ttk.Label(self, text="Record Type:")
+        record_type_label.grid(row=0, column=0, sticky="e", pady=5, padx=5)
+
+        self.record_type = ttk.Combobox(
+            self, values=self.record_types, state="readonly", width=10
+        )
+        self.record_type.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
 
 
 class AdvancedTab(ttk.Frame):
@@ -190,13 +297,13 @@ class AdvancedTab(ttk.Frame):
         size_note = tk.Label(
             self, text="Optional", font=("TkDefaultFont", 10, "italic")
         )
-        size_note.grid(row=3, column=2, columnspan=2, pady=10, padx=(0, 25), sticky="e")
+        size_note.grid(row=3, column=2, columnspan=2, pady=5, padx=(0, 25), sticky="e")
 
         size_label = tk.Label(
             self,
             text="Container Size:",
         )
-        size_label.grid(row=4, column=0, columnspan=2, pady=10, padx=5, sticky="w")
+        size_label.grid(row=4, column=0, columnspan=2, pady=5, padx=5, sticky="w")
         options = ["1kB", "2kB", "4kB", "8kB", "16kB", "32kB"]
         self.size_dropdown = ttk.Combobox(
             self,
