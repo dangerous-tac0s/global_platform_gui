@@ -24,7 +24,7 @@ class GPManagerApp:
         "javacard-memory.cap": "A0000008466D656D6F727901",
         "keycard.cap": "A0000008040001",
         "openjavacard-ndef-full.cap": "D2760000850101",
-        "openjavacard-ndef-tiny.cap": "D2760000850101",
+        # "openjavacard-ndef-tiny.cap": "D2760000850101",
         "SatoChip.cap": "5361746F4368697000",
         "Satodime.cap": "5361746F44696D6500",
         "SeedKeeper.cap": "536565644B656570657200",
