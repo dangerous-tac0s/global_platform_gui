@@ -1,3 +1,6 @@
+> [!INFO]
+> LEGACY! See [this repo](https://github.com/dangerous-tac0s/global_platform_gui_qt) for the current version made with PyQT.
+
 # Global Platform GUI
 A quick attempt at GUI wrapper for [Global Platform Pro](https://github.com/martinpaljak/GlobalPlatformPro) by 
 [Martin Paljak](https://github.com/martinpaljak) geared towards the [flexSecure](https://dngr.us/flexsecure).
