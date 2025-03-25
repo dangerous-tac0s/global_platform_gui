@@ -1,4 +1,4 @@
-> [!INFO]
+> [!IMPORTANT]
 > LEGACY! See [this repo](https://github.com/dangerous-tac0s/global_platform_gui_qt) for the current version made with PyQT.
 
 # Global Platform GUI
